@@ -1,0 +1,6 @@
+{
+  "name": "Suk",
+  "description": "Multi-tenant white-label reseller marketplace platform connecting business owners, reseller storefronts, and customers with commission tracking, customizable storefronts, and automated notifications.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
