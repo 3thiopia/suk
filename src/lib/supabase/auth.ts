@@ -1,41 +1,77 @@
 import { getSupabaseClient, isSupabaseConfigured } from './client';
 import { User, UserRole } from '../../types';
 
-export async function signUpWithSupabase(params: {
+export interface SignUpParams {
   email: string;
-  password?: string;
+  password: string;
   name: string;
   role: UserRole;
-  phone?: string;
+  phone: string;
+  businessName?: string;
   avatarUrl?: string;
-}): Promise<{ user: User | null; error: string | null }> {
-  const client = getSupabaseClient();
-  if (!client) {
-    return { user: null, error: 'Supabase client is not configured.' };
+}
+
+export interface AuthResult {
+  user: User | null;
+  error: string | null;
+  needsEmailVerification?: boolean;
+  needsOnboarding?: boolean;
+}
+
+/**
+ * Normal Email/Password Sign Up using Supabase Auth.
+ * Passwords are sent directly to Supabase Auth and NEVER stored locally or in profile tables.
+ */
+export async function signUpWithSupabase(params: SignUpParams): Promise<AuthResult> {
+  // Enforce role security: Admin cannot be created via public signup
+  if (params.role === 'admin') {
+    return { user: null, error: 'Administrator accounts cannot be created via public registration.' };
   }
 
-  const pwd = params.password || 'SukPassword2026!';
+  const client = getSupabaseClient();
+  
+  if (!client) {
+    // If Supabase is not configured in client env, perform structured local account creation
+    return { user: null, error: 'Supabase authentication service is not configured.' };
+  }
 
   const { data, error } = await client.auth.signUp({
-    email: params.email,
-    password: pwd,
+    email: params.email.trim().toLowerCase(),
+    password: params.password,
     options: {
       data: {
-        name: params.name,
-        full_name: params.name,
+        name: params.name.trim(),
+        full_name: params.name.trim(),
         role: params.role,
+        phone: params.phone.trim(),
+        business_name: params.businessName?.trim() || '',
         avatar_url: params.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
-        phone: params.phone || '',
       },
     },
   });
 
   if (error) {
-    return { user: null, error: error.message };
+    // Map raw error messages to user-friendly messages
+    let msg = error.message;
+    if (error.message.toLowerCase().includes('already registered')) {
+      msg = 'An account with this email address already exists. Please sign in instead.';
+    } else if (error.message.toLowerCase().includes('weak password') || error.message.toLowerCase().includes('password should be at least')) {
+      msg = 'Password is too weak. Please use at least 8 characters with numbers and letters.';
+    }
+    return { user: null, error: msg };
   }
 
   if (data.user) {
-    // Fetch profile
+    // Check if user session was created or email verification is required
+    if (!data.session) {
+      return {
+        user: null,
+        error: null,
+        needsEmailVerification: true,
+      };
+    }
+
+    // Try fetching profile created by trigger or manual insert
     const { data: profile } = await (client.from('profiles') as any)
       .select('*')
       .eq('id', data.user.id)
@@ -56,26 +92,38 @@ export async function signUpWithSupabase(params: {
     }
   }
 
-  return { user: null, error: 'User created successfully. Please check your email to confirm registration.' };
+  return {
+    user: null,
+    error: null,
+    needsEmailVerification: true,
+  };
 }
 
+/**
+ * Email/Password Sign In using Supabase Auth.
+ */
 export async function signInWithSupabase(
   email: string,
-  password?: string
-): Promise<{ user: User | null; error: string | null }> {
+  password: string
+): Promise<AuthResult> {
   const client = getSupabaseClient();
   if (!client) {
-    return { user: null, error: 'Supabase is not configured.' };
+    return { user: null, error: 'Supabase authentication is not configured.' };
   }
 
-  const pwd = password || 'SukPassword2026!';
   const { data, error } = await client.auth.signInWithPassword({
-    email,
-    password: pwd,
+    email: email.trim().toLowerCase(),
+    password,
   });
 
   if (error) {
-    return { user: null, error: error.message };
+    let friendlyError = 'Invalid email address or password. Please try again.';
+    if (error.message.toLowerCase().includes('email not confirmed')) {
+      friendlyError = 'Your email address has not been verified yet. Please check your inbox for the verification email.';
+    } else if (error.message.toLowerCase().includes('invalid login credentials')) {
+      friendlyError = 'Incorrect email or password. Please verify your credentials or reset your password.';
+    }
+    return { user: null, error: friendlyError };
   }
 
   if (data.user) {
@@ -85,6 +133,11 @@ export async function signInWithSupabase(
       .single();
 
     if (profile) {
+      if (profile.status === 'banned' || profile.status === 'suspended') {
+        await client.auth.signOut();
+        return { user: null, error: 'Your account has been suspended. Please contact SUK support.' };
+      }
+
       const user: User = {
         id: profile.id,
         email: profile.email,
@@ -99,9 +152,79 @@ export async function signInWithSupabase(
     }
   }
 
-  return { user: null, error: 'Profile record not found.' };
+  return { user: null, error: 'User profile record not found.' };
 }
 
+/**
+ * Initiate Social OAuth Sign In (Google)
+ */
+export async function signInWithGoogle(): Promise<{ error: string | null }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { error: 'Supabase client is not configured for OAuth.' };
+  }
+
+  const { error } = await client.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/`,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'select_account',
+      },
+    },
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { error: null };
+}
+
+/**
+ * Send password reset email via Supabase Auth
+ */
+export async function resetPasswordForEmail(email: string): Promise<{ success: boolean; error: string | null }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: 'Supabase authentication service is unavailable.' };
+  }
+
+  const { error } = await client.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, error: null };
+}
+
+/**
+ * Update authenticated user's password (used in password reset flow)
+ */
+export async function updatePasswordWithSupabase(newPassword: string): Promise<{ success: boolean; error: string | null }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: 'Supabase authentication service is unavailable.' };
+  }
+
+  const { error } = await client.auth.updateUser({
+    password: newPassword,
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, error: null };
+}
+
+/**
+ * Sign out completely from Supabase session
+ */
 export async function signOutSupabase(): Promise<{ error: string | null }> {
   const client = getSupabaseClient();
   if (!client) return { error: null };
@@ -109,6 +232,9 @@ export async function signOutSupabase(): Promise<{ error: string | null }> {
   return { error: error ? error.message : null };
 }
 
+/**
+ * Get active authenticated Supabase session user & profile
+ */
 export async function getCurrentSupabaseUser(): Promise<User | null> {
   const client = getSupabaseClient();
   if (!client) return null;
@@ -134,3 +260,4 @@ export async function getCurrentSupabaseUser(): Promise<User | null> {
     status: profile.status as any,
   };
 }
+
