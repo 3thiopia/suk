@@ -144,6 +144,14 @@ export function BusinessOrders() {
   const [confirmRejectOrder, setConfirmRejectOrder] = useState<Order | null>(null);
   const [rejectionReasonOption, setRejectionReasonOption] = useState<string>('Product out of stock');
   const [customRejectionReason, setCustomRejectionReason] = useState<string>('');
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+
+  const toggleExpandCard = (orderId: string) => {
+    setExpandedCards((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId],
+    }));
+  };
 
   if (!business) {
     return <div className="p-8 text-center text-sm text-neutral-500">Business profile not found.</div>;
@@ -355,128 +363,167 @@ export function BusinessOrders() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {paginatedOrders.map((order) => {
                 const bizItems = order.items.filter((i) => i.businessId === business.id);
-                const totalQty = bizItems.reduce((acc, item) => acc + item.quantity, 0);
+                const isExpanded = !!expandedCards[order.id];
 
                 return (
                   <div
                     key={order.id}
-                    className="rounded-2xl border border-neutral-200 bg-white p-4.5 shadow-xs space-y-3.5 hover:border-neutral-300 transition-all flex flex-col justify-between"
+                    className="rounded-2xl border border-neutral-200 bg-white shadow-xs overflow-hidden transition-all hover:border-neutral-300 flex flex-col justify-between"
                   >
-                    {/* Top Bar: Order ID, Date & Status */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-neutral-900 text-xs sm:text-sm">#{order.id}</span>
-                          <span className="text-[11px] font-medium text-neutral-400">• {formatDate(order.createdAt)}</span>
+                    {/* Collapsed Header - Always Visible */}
+                    <div
+                      onClick={() => toggleExpandCard(order.id)}
+                      className="p-3.5 sm:p-4 cursor-pointer hover:bg-neutral-50/60 transition-colors select-none"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono font-bold text-neutral-900 text-xs sm:text-sm shrink-0">#{order.id}</span>
+                          <span className="text-[11px] font-medium text-neutral-400 truncate">• {formatDate(order.createdAt)}</span>
                         </div>
-                        <p className="text-[11px] text-neutral-500 mt-0.5">
-                          Storefront: <strong className="text-neutral-800">{order.storefrontName || 'Direct Store'}</strong>
-                        </p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <OrderStatusBadge status={order.status} />
+                          <button
+                            type="button"
+                            aria-label={isExpanded ? "Collapse order" : "Expand order"}
+                            className="p-1 rounded-lg bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900 transition-colors"
+                          >
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </button>
+                        </div>
                       </div>
-                      <OrderStatusBadge status={order.status} />
+
+                      {/* Product Title in Collapsed Header */}
+                      <div className="mt-2.5 flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs sm:text-sm font-bold text-neutral-900 truncate">
+                            {bizItems[0]?.productTitle || 'Order Product'}
+                            {bizItems.length > 1 && (
+                              <span className="text-xs font-semibold text-neutral-500 ml-1.5">
+                                (+{bizItems.length - 1} item{bizItems.length > 2 ? 's' : ''})
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[11px] text-neutral-500 mt-0.5 truncate">
+                            Storefront: <strong className="text-neutral-800">{order.storefrontName || 'Direct Store'}</strong> • Amount: <strong className="text-neutral-900 font-extrabold">{formatCurrency(order.totalAmount)}</strong>
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Product Details & Image */}
-                    <div className="space-y-2">
-                      {bizItems.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-3 bg-neutral-50/80 p-2.5 rounded-xl border border-neutral-100">
-                          <img
-                            src={item.coverImage}
-                            alt={item.productTitle}
-                            className="h-11 w-11 rounded-lg object-cover border border-neutral-200 shrink-0"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold text-neutral-900 truncate">{item.productTitle}</p>
-                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-neutral-500">
-                              <span>Quantity: <strong className="text-neutral-900 font-bold">{item.quantity}</strong></span>
-                              <span>•</span>
-                              <span>Unit Price: {formatCurrency(item.unitPrice)}</span>
+                    {/* Expanded Content Section */}
+                    {isExpanded && (
+                      <div className="border-t border-neutral-100 p-3.5 sm:p-4 space-y-3.5 bg-neutral-50/30 animate-fadeIn">
+                        {/* Product Details & Image */}
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Ordered Items</p>
+                          {bizItems.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-neutral-200/80 shadow-2xs">
+                              <img
+                                src={item.coverImage}
+                                alt={item.productTitle}
+                                className="h-11 w-11 rounded-lg object-cover border border-neutral-200 shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-neutral-900 truncate">{item.productTitle}</p>
+                                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-neutral-500">
+                                  <span>Quantity: <strong className="text-neutral-900 font-bold">{item.quantity}</strong></span>
+                                  <span>•</span>
+                                  <span>Unit Price: {formatCurrency(item.unitPrice)}</span>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="text-xs font-extrabold text-neutral-900">
+                                  {formatCurrency(item.unitPrice * item.quantity)}
+                                </span>
+                              </div>
                             </div>
+                          ))}
+                        </div>
+
+                        {/* Customer Info (Name & Phone) */}
+                        <div className="rounded-xl border border-neutral-200/80 bg-white p-3 flex flex-wrap items-center justify-between gap-2 text-xs shadow-2xs">
+                          <div className="flex items-center gap-2 text-neutral-900 font-bold">
+                            <UserIcon className="h-4 w-4 text-neutral-500 shrink-0" />
+                            <span>Customer: {order.customerName}</span>
                           </div>
-                          <div className="text-right shrink-0">
-                            <span className="text-xs font-extrabold text-neutral-900">
-                              {formatCurrency(item.unitPrice * item.quantity)}
-                            </span>
+                          <div className="flex items-center gap-1.5 text-neutral-800 font-mono text-xs">
+                            <Phone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                            <a
+                              href={`tel:${order.customerPhone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-bold hover:underline hover:text-emerald-700"
+                            >
+                              {order.customerPhone}
+                            </a>
                           </div>
                         </div>
-                      ))}
-                    </div>
 
-                    {/* Customer Info (Name & Phone) */}
-                    <div className="rounded-xl border border-neutral-100 bg-neutral-50/50 p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-2 text-neutral-900 font-bold">
-                        <UserIcon className="h-4 w-4 text-neutral-500 shrink-0" />
-                        <span>Customer: {order.customerName}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-neutral-800 font-mono text-xs">
-                        <Phone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                        <a href={`tel:${order.customerPhone}`} className="font-bold hover:underline hover:text-emerald-700">
-                          {order.customerPhone}
-                        </a>
-                      </div>
-                    </div>
+                        {/* Financial Summary Box */}
+                        <FinancialSummaryBox order={order} />
 
-                    {/* Financial Summary Box */}
-                    <FinancialSummaryBox order={order} />
+                        {/* Action Buttons */}
+                        <div className="pt-2 border-t border-neutral-200/60 flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                            {order.status === 'pending' && (
+                              <>
+                                <button
+                                  onClick={() => onRequestStatusChange(order, 'accepted')}
+                                  className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition-colors cursor-pointer"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  <span>Accept</span>
+                                </button>
+                                <button
+                                  onClick={() => onRequestStatusChange(order, 'rejected')}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+                                >
+                                  <XCircle className="h-3.5 w-3.5" />
+                                  <span>Reject</span>
+                                </button>
+                              </>
+                            )}
 
-                    {/* Action Buttons */}
-                    <div className="pt-2 border-t border-neutral-100 flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {order.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => onRequestStatusChange(order, 'accepted')}
-                              className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition-colors cursor-pointer"
-                            >
-                              <CheckCircle className="h-3.5 w-3.5" />
-                              <span>Accept</span>
-                            </button>
-                            <button
-                              onClick={() => onRequestStatusChange(order, 'rejected')}
-                              className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
-                            >
-                              <XCircle className="h-3.5 w-3.5" />
-                              <span>Reject</span>
-                            </button>
-                          </>
-                        )}
+                            {order.status === 'accepted' && (
+                              <button
+                                onClick={() => onRequestStatusChange(order, 'shipped')}
+                                className="inline-flex items-center gap-1 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-purple-700 transition-colors cursor-pointer"
+                              >
+                                <Truck className="h-3.5 w-3.5" />
+                                <span>Mark Shipped</span>
+                              </button>
+                            )}
 
-                        {order.status === 'accepted' && (
+                            {order.status === 'shipped' && (
+                              <button
+                                onClick={() => onRequestStatusChange(order, 'delivered')}
+                                className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-blue-700 transition-colors cursor-pointer"
+                              >
+                                <PackageCheck className="h-3.5 w-3.5" />
+                                <span>Mark Delivered</span>
+                              </button>
+                            )}
+
+                            {(order.status === 'delivered' || order.status === 'completed' || order.isDeliveredLocked) && (
+                              <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-200">
+                                <Lock className="h-3.5 w-3.5 text-emerald-600" />
+                                <span>Locked</span>
+                              </span>
+                            )}
+                          </div>
+
                           <button
-                            onClick={() => onRequestStatusChange(order, 'shipped')}
-                            className="inline-flex items-center gap-1 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-purple-700 transition-colors cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveOrder(order);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer shadow-2xs"
                           >
-                            <Truck className="h-3.5 w-3.5" />
-                            <span>Mark Shipped</span>
+                            <Eye className="h-3.5 w-3.5" />
+                            <span>Inspect Details</span>
                           </button>
-                        )}
-
-                        {order.status === 'shipped' && (
-                          <button
-                            onClick={() => onRequestStatusChange(order, 'delivered')}
-                            className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-blue-700 transition-colors cursor-pointer"
-                          >
-                            <PackageCheck className="h-3.5 w-3.5" />
-                            <span>Mark Delivered</span>
-                          </button>
-                        )}
-
-                        {(order.status === 'delivered' || order.status === 'completed' || order.isDeliveredLocked) && (
-                          <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-200">
-                            <Lock className="h-3.5 w-3.5 text-emerald-600" />
-                            <span>Locked</span>
-                          </span>
-                        )}
+                        </div>
                       </div>
-
-                      <button
-                        onClick={() => setActiveOrder(order)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        <span>Inspect Details</span>
-                      </button>
-                    </div>
+                    )}
                   </div>
                 );
               })}

@@ -4,6 +4,8 @@ import { storage } from '../../lib/storage';
 import { Product } from '../../types';
 import { formatCurrency } from '../../lib/utils';
 import { EmptyState } from '../common/EmptyState';
+import { ResponsiveDataTable, Column } from '../common/ResponsiveDataTable';
+import { ViewMode } from '../common/ViewToggle';
 
 export function BusinessInventory() {
   const currentUser = storage.getCurrentUser();
@@ -13,6 +15,9 @@ export function BusinessInventory() {
   const [filterStock, setFilterStock] = useState<'all' | 'low' | 'out' | 'in'>('all');
   const [stockEdits, setStockEdits] = useState<Record<string, number>>({});
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640 ? 'cards' : 'table'
+  );
 
   if (!business) {
     return <div className="p-8 text-center text-xs text-neutral-500">Business profile not found.</div>;
@@ -60,6 +65,119 @@ export function BusinessInventory() {
   };
 
   const hasEdits = Object.keys(stockEdits).length > 0;
+
+  const inventoryColumns: Column<Product>[] = [
+    {
+      key: 'product',
+      header: 'Product Details',
+      priority: 'primary',
+      cell: (product) => (
+        <div className="flex items-center gap-3">
+          <img
+            src={product.images[0]}
+            alt={product.title}
+            className="h-10 w-10 rounded-xl object-cover border shrink-0"
+          />
+          <div>
+            <p className="font-bold text-neutral-900">{product.title}</p>
+            <span className="text-[10px] text-neutral-400">
+              {product.brand} • {product.category}
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'price',
+      header: 'Wholesale Price',
+      priority: 'secondary',
+      cell: (product) => (
+        <span className="font-extrabold text-neutral-900">{formatCurrency(product.price)}</span>
+      ),
+    },
+    {
+      key: 'stock',
+      header: 'Current Stock',
+      priority: 'secondary',
+      cell: (product) => {
+        const currentVal = stockEdits[product.id] !== undefined ? stockEdits[product.id] : product.stock;
+        return (
+          <div>
+            <span className="font-mono font-bold text-sm text-neutral-900">{currentVal}</span>
+            {stockEdits[product.id] !== undefined && (
+              <span className="ml-2 text-[10px] font-bold text-amber-600">(edited)</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'status',
+      header: 'Stock Status',
+      priority: 'secondary',
+      cell: (product) => {
+        const currentVal = stockEdits[product.id] !== undefined ? stockEdits[product.id] : product.stock;
+        if (currentVal === 0) {
+          return (
+            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800">
+              Out of Stock
+            </span>
+          );
+        }
+        if (currentVal <= 10) {
+          return (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
+              Low Stock Alert
+            </span>
+          );
+        }
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+            In Stock
+          </span>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      header: 'Quick Adjust Inventory',
+      priority: 'optional',
+      align: 'right',
+      cell: (product) => {
+        const currentVal = stockEdits[product.id] !== undefined ? stockEdits[product.id] : product.stock;
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              onClick={() => handleStockChange(product.id, currentVal - 1)}
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+              title="Decrease by 1"
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </button>
+            <input
+              type="number"
+              value={currentVal}
+              onChange={(e) => handleStockChange(product.id, parseInt(e.target.value) || 0)}
+              className="w-16 rounded-lg border border-neutral-300 py-1 text-center font-mono text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-900"
+            />
+            <button
+              onClick={() => handleStockChange(product.id, currentVal + 1)}
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+              title="Increase by 1"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => handleStockChange(product.id, currentVal + 10)}
+              className="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 text-[11px] font-bold text-neutral-700 hover:bg-neutral-100"
+            >
+              +10
+            </button>
+          </div>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -159,110 +277,16 @@ export function BusinessInventory() {
         />
       </div>
 
-      {/* Inventory Table */}
-      {filteredProducts.length === 0 ? (
-        <EmptyState
-          icon={Package}
-          title="No Inventory Items Found"
-          description="No products match your current stock filter or search query."
-        />
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead className="border-b border-neutral-200 bg-neutral-50/80 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-                <tr>
-                  <th className="py-3 px-4">Product Details</th>
-                  <th className="py-3 px-4">Wholesale Price</th>
-                  <th className="py-3 px-4">Current Stock</th>
-                  <th className="py-3 px-4">Stock Status</th>
-                  <th className="py-3 px-4 text-right">Quick Adjust Inventory</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 text-xs text-neutral-800">
-                {filteredProducts.map((product) => {
-                  const currentVal =
-                    stockEdits[product.id] !== undefined ? stockEdits[product.id] : product.stock;
-
-                  return (
-                    <tr key={product.id} className="hover:bg-neutral-50/80 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={product.images[0]}
-                            alt={product.title}
-                            className="h-10 w-10 rounded-xl object-cover border shrink-0"
-                          />
-                          <div>
-                            <p className="font-bold text-neutral-900">{product.title}</p>
-                            <span className="text-[10px] text-neutral-400">
-                              {product.brand} • {product.category}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-extrabold text-neutral-900">
-                        {formatCurrency(product.price)}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="font-mono font-bold text-sm text-neutral-900">{currentVal}</span>
-                        {stockEdits[product.id] !== undefined && (
-                          <span className="ml-2 text-[10px] font-bold text-amber-600">(edited)</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        {currentVal === 0 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800">
-                            Out of Stock
-                          </span>
-                        ) : currentVal <= 10 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
-                            Low Stock Alert
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                            In Stock
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleStockChange(product.id, currentVal - 1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
-                            title="Decrease by 1"
-                          >
-                            <Minus className="h-3.5 w-3.5" />
-                          </button>
-                          <input
-                            type="number"
-                            value={currentVal}
-                            onChange={(e) => handleStockChange(product.id, parseInt(e.target.value) || 0)}
-                            className="w-16 rounded-lg border border-neutral-300 py-1 text-center font-mono text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-900"
-                          />
-                          <button
-                            onClick={() => handleStockChange(product.id, currentVal + 1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
-                            title="Increase by 1"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleStockChange(product.id, currentVal + 10)}
-                            className="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 text-[11px] font-bold text-neutral-700 hover:bg-neutral-100"
-                          >
-                            +10
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* Responsive Inventory Data Table */}
+      <ResponsiveDataTable
+        data={filteredProducts}
+        columns={inventoryColumns}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        showViewToggle={true}
+        emptyTitle="No Inventory Items Found"
+        emptyDescription="No products match your current stock filter or search query."
+      />
     </div>
   );
 }

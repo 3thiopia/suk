@@ -4,6 +4,8 @@ import { storage } from '../../lib/storage';
 import { UserAccountStatus, Storefront } from '../../types';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { Modal } from '../common/Modal';
+import { ResponsiveDataTable, Column } from '../common/ResponsiveDataTable';
+import { ViewMode } from '../common/ViewToggle';
 
 interface ResellerManagementTabProps {
   onNavigate: (path: string) => void;
@@ -17,6 +19,9 @@ export function ResellerManagementTab({ onNavigate }: ResellerManagementTabProps
   const [actionReason, setActionReason] = useState('');
   const [banType, setBanType] = useState<'permanent' | 'temporary'>('permanent');
   const [suspensionEndDate, setSuspensionEndDate] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640 ? 'cards' : 'table'
+  );
 
   const storefronts = storage.getStorefronts();
   const users = storage.getUsers();
@@ -56,6 +61,151 @@ export function ResellerManagementTab({ onNavigate }: ResellerManagementTabProps
     storage.reactivateUser(sf.resellerId, 'Reactivated by platform administrator');
   };
 
+  const resellerColumns: Column<Storefront>[] = [
+    {
+      key: 'storefront',
+      header: 'Storefront & URL',
+      priority: 'primary',
+      cell: (sf) => (
+        <div className="flex items-center gap-3">
+          <img src={sf.logoUrl} alt={sf.storeName} className="h-9 w-9 rounded-xl object-cover border shrink-0" />
+          <div>
+            <p className="font-bold text-neutral-900">{sf.storeName}</p>
+            <button
+              onClick={() => onNavigate(`/store/${sf.slug}`)}
+              className="flex items-center gap-1 text-[10px] font-mono font-semibold text-emerald-700 hover:underline"
+            >
+              /store/{sf.slug} <ExternalLink className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'theme',
+      header: 'Theme & Layout',
+      priority: 'secondary',
+      cell: (sf) => (
+        <span className="rounded-lg bg-neutral-100 px-2 py-1 text-[10px] font-bold capitalize text-neutral-700">
+          {sf.themeColor} • {sf.layoutMode}
+        </span>
+      ),
+    },
+    {
+      key: 'earnings',
+      header: 'Total Earnings',
+      priority: 'secondary',
+      cell: (sf) => <span className="font-bold text-neutral-900">{formatCurrency(sf.totalEarnings)}</span>,
+    },
+    {
+      key: 'payout',
+      header: 'Pending Payout',
+      priority: 'secondary',
+      cell: (sf) => (
+        <span className={`font-bold ${sf.pendingPayout >= sf.minPayoutThreshold ? 'text-emerald-700 font-extrabold' : 'text-neutral-600'}`}>
+          {formatCurrency(sf.pendingPayout)}
+        </span>
+      ),
+    },
+    {
+      key: 'access',
+      header: 'Store Access',
+      priority: 'secondary',
+      cell: (sf) =>
+        sf.isDisabled ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-bold text-red-800 border border-red-300">
+            <Lock className="h-3 w-3" /> Storefront Disabled
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+            <Unlock className="h-3 w-3" /> Publicly Active
+          </span>
+        ),
+    },
+    {
+      key: 'status',
+      header: 'Account Status',
+      priority: 'secondary',
+      cell: (sf) => {
+        const resellerUser = users.find((u) => u.id === sf.resellerId);
+        const currentStatus: UserAccountStatus = sf.status || resellerUser?.status || 'active';
+        return (
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+              currentStatus === 'active'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : currentStatus === 'suspended'
+                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                : 'bg-red-50 text-red-700 border border-red-200'
+            }`}
+          >
+            {currentStatus}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      header: 'Governance Actions',
+      priority: 'optional',
+      align: 'right',
+      cell: (sf) => {
+        const resellerUser = users.find((u) => u.id === sf.resellerId);
+        const currentStatus: UserAccountStatus = sf.status || resellerUser?.status || 'active';
+
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              onClick={() => {
+                setDisableModalStorefront(sf);
+                setActionReason(sf.disabledReason || '');
+              }}
+              className={`rounded-lg px-2.5 py-1 text-[11px] font-bold border transition-colors ${
+                sf.isDisabled
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-neutral-100 text-neutral-700 border-neutral-300 hover:bg-neutral-200'
+              }`}
+            >
+              {sf.isDisabled ? 'Enable Store' : 'Disable Store'}
+            </button>
+
+            {currentStatus === 'active' ? (
+              <button
+                onClick={() => {
+                  setSuspendModalStorefront(sf);
+                  setActionReason('');
+                  setSuspensionEndDate('');
+                }}
+                className="rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 border border-amber-200 hover:bg-amber-100"
+              >
+                Suspend
+              </button>
+            ) : (
+              <button
+                onClick={() => handleReactivate(sf)}
+                className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+              >
+                Reactivate
+              </button>
+            )}
+
+            {currentStatus !== 'banned' && (
+              <button
+                onClick={() => {
+                  setBanModalStorefront(sf);
+                  setActionReason('');
+                }}
+                className="rounded-lg bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 border border-red-200 hover:bg-red-100"
+              >
+                Ban Account
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header & Controls */}
@@ -79,138 +229,16 @@ export function ResellerManagementTab({ onNavigate }: ResellerManagementTabProps
         </div>
       </div>
 
-      {/* Reseller Table */}
-      <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xs">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead className="border-b border-neutral-200 bg-neutral-50/80 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-            <tr>
-              <th className="py-3.5 px-4">Storefront & URL</th>
-              <th className="py-3.5 px-4">Theme & Layout</th>
-              <th className="py-3.5 px-4">Total Earnings</th>
-              <th className="py-3.5 px-4">Pending Payout</th>
-              <th className="py-3.5 px-4">Store Access</th>
-              <th className="py-3.5 px-4">Account Status</th>
-              <th className="py-3.5 px-4 text-right">Governance Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100 text-neutral-800">
-            {filtered.map((sf) => {
-              const resellerUser = users.find((u) => u.id === sf.resellerId);
-              const currentStatus: UserAccountStatus = sf.status || resellerUser?.status || 'active';
-
-              return (
-                <tr key={sf.id} className="hover:bg-neutral-50 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-3">
-                      <img src={sf.logoUrl} alt={sf.storeName} className="h-9 w-9 rounded-xl object-cover border" />
-                      <div>
-                        <p className="font-bold text-neutral-900">{sf.storeName}</p>
-                        <button
-                          onClick={() => onNavigate(`/store/${sf.slug}`)}
-                          className="flex items-center gap-1 text-[10px] font-mono font-semibold text-emerald-700 hover:underline"
-                        >
-                          /store/{sf.slug} <ExternalLink className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <span className="rounded-lg bg-neutral-100 px-2 py-1 text-[10px] font-bold capitalize text-neutral-700">
-                      {sf.themeColor} • {sf.layoutMode}
-                    </span>
-                  </td>
-
-                  <td className="py-3.5 px-4 font-bold text-neutral-900">{formatCurrency(sf.totalEarnings)}</td>
-
-                  <td className="py-3.5 px-4">
-                    <span className={`font-bold ${sf.pendingPayout >= sf.minPayoutThreshold ? 'text-emerald-700 font-extrabold' : 'text-neutral-600'}`}>
-                      {formatCurrency(sf.pendingPayout)}
-                    </span>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    {sf.isDisabled ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-bold text-red-800 border border-red-300">
-                        <Lock className="h-3 w-3" /> Storefront Disabled
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                        <Unlock className="h-3 w-3" /> Publicly Active
-                      </span>
-                    )}
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                        currentStatus === 'active'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : currentStatus === 'suspended'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : 'bg-red-50 text-red-700 border border-red-200'
-                      }`}
-                    >
-                      {currentStatus}
-                    </span>
-                  </td>
-
-                  <td className="py-3.5 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => {
-                          setDisableModalStorefront(sf);
-                          setActionReason(sf.disabledReason || '');
-                        }}
-                        className={`rounded-lg px-2.5 py-1 text-[11px] font-bold border transition-colors ${
-                          sf.isDisabled
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                            : 'bg-neutral-100 text-neutral-700 border-neutral-300 hover:bg-neutral-200'
-                        }`}
-                      >
-                        {sf.isDisabled ? 'Enable Store' : 'Disable Store'}
-                      </button>
-
-                      {currentStatus === 'active' ? (
-                        <button
-                          onClick={() => {
-                            setSuspendModalStorefront(sf);
-                            setActionReason('');
-                            setSuspensionEndDate('');
-                          }}
-                          className="rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 border border-amber-200 hover:bg-amber-100"
-                        >
-                          Suspend
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleReactivate(sf)}
-                          className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-                        >
-                          Reactivate
-                        </button>
-                      )}
-
-                      {currentStatus !== 'banned' && (
-                        <button
-                          onClick={() => {
-                            setBanModalStorefront(sf);
-                            setActionReason('');
-                            setBanType('permanent');
-                          }}
-                          className="rounded-lg bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 border border-red-200 hover:bg-red-100"
-                        >
-                          Ban
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {/* Responsive Storefront Data Table */}
+      <ResponsiveDataTable
+        data={filtered}
+        columns={resellerColumns}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        showViewToggle={true}
+        emptyTitle="No Storefronts Found"
+        emptyDescription="No reseller storefronts match your search query."
+      />
 
       {/* Disable / Enable Storefront Modal */}
       {disableModalStorefront && (

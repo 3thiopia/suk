@@ -1,36 +1,60 @@
-import React from 'react';
-import { DollarSign } from 'lucide-react';
+import React, { useState } from 'react';
 
-interface SukLogoProps {
+export interface SukLogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   lightMode?: boolean;
+  showText?: boolean;
+  src?: string;
+  alt?: string;
 }
 
-export function SukLogoIcon({ className = 'h-6 w-6', color = 'emerald' }: { className?: string; color?: 'emerald' | 'white' | 'dark' }) {
-  const colorClass = color === 'emerald' ? 'text-emerald-500' : color === 'white' ? 'text-white' : 'text-neutral-900';
+export const SUK_LOGO_PATH = '/images/suk-logo.png';
+
+export function SukLogoIcon({
+  className = 'h-7 w-7',
+  src = SUK_LOGO_PATH,
+}: {
+  className?: string;
+  src?: string;
+  color?: 'emerald' | 'white' | 'dark';
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <div className={`flex items-center justify-center bg-neutral-900 text-emerald-400 font-extrabold text-xs rounded-lg p-1 ${className}`}>
+        $
+      </div>
+    );
+  }
 
   return (
-    <DollarSign
-      className={`${className} ${colorClass}`}
-      strokeWidth={3}
+    <img
+      src={src}
+      alt="SUK"
+      onError={() => setHasError(true)}
+      className={`object-cover rounded-xl shrink-0 select-none ${className}`}
+      loading="eager"
     />
   );
 }
 
-export function SukLogo({ className = '', size = 'md', lightMode = false }: SukLogoProps) {
+export function SukLogo({
+  className = '',
+  size = 'md',
+  lightMode = false,
+  showText = true,
+  src = SUK_LOGO_PATH,
+  alt = 'SUK Logo',
+}: SukLogoProps) {
+  const [hasError, setHasError] = useState(false);
+
   const textSizes = {
     sm: 'text-lg',
     md: 'text-2xl',
     lg: 'text-3xl sm:text-4xl',
     xl: 'text-4xl sm:text-5xl lg:text-6xl',
-  };
-
-  const iconSizes = {
-    sm: 'h-5 w-5',
-    md: 'h-6 w-6',
-    lg: 'h-8 w-8',
-    xl: 'h-12 w-12 sm:h-14 sm:w-14',
   };
 
   const badgeWrapper = {
@@ -41,17 +65,31 @@ export function SukLogo({ className = '', size = 'md', lightMode = false }: SukL
   };
 
   return (
-    <div className={`flex items-center gap-2.5 select-none ${className}`}>
-      {/* Brand Icon Badge with Dollar Sign */}
-      <div className={`flex items-center justify-center bg-neutral-900 text-emerald-400 shadow-xs border border-neutral-800 ${badgeWrapper[size]}`}>
-        <SukLogoIcon className={iconSizes[size]} color="emerald" />
+    <div className={`inline-flex items-center gap-2.5 select-none shrink-0 ${className}`}>
+      {/* Brand Image Logo Badge (Replaceable via /images/suk-logo.png) */}
+      <div className={`relative flex items-center justify-center overflow-hidden bg-neutral-900 text-emerald-400 shadow-xs border border-neutral-800 shrink-0 ${badgeWrapper[size]}`}>
+        {!hasError ? (
+          <img
+            src={src}
+            alt={alt}
+            onError={() => setHasError(true)}
+            className="h-full w-full object-cover rounded-[inherit] transition-opacity duration-200"
+            loading="eager"
+          />
+        ) : (
+          <span className="font-extrabold text-emerald-400">$</span>
+        )}
       </div>
 
-      {/* Brand Name Text */}
-      <span className={`font-black tracking-tight ${textSizes[size]} ${lightMode ? 'text-white' : 'text-neutral-900'}`}>
-        SU<span className="text-emerald-600">K</span>
-      </span>
+      {/* Brand Name Text: SUK with Green K */}
+      {showText && (
+        <span className={`font-black tracking-tight ${textSizes[size]} ${lightMode ? 'text-white' : 'text-neutral-900'}`}>
+          SU<span className="text-emerald-600">K</span>
+        </span>
+      )}
     </div>
   );
 }
+
+
 

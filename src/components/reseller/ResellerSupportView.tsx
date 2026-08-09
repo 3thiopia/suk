@@ -21,6 +21,8 @@ import {
 import { formatDate } from '../../lib/utils';
 import { Modal } from '../common/Modal';
 import { EmptyState } from '../common/EmptyState';
+import { ResponsiveDataTable, Column } from '../common/ResponsiveDataTable';
+import { ViewMode } from '../common/ViewToggle';
 
 const RESELLER_CATEGORIES: ResellerIssueCategory[] = [
   'Commission issue',
@@ -40,6 +42,9 @@ export function ResellerSupportView({ onNavigate }: ResellerSupportViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640 ? 'cards' : 'table'
+  );
 
   // New ticket state
   const [newCategory, setNewCategory] = useState<ResellerIssueCategory>('Commission issue');
@@ -109,6 +114,59 @@ export function ResellerSupportView({ onNavigate }: ResellerSupportViewProps) {
     }
   };
 
+  const ticketColumns: Column<SupportTicket>[] = [
+    {
+      key: 'id',
+      header: 'Ticket ID',
+      priority: 'primary',
+      cell: (t) => <span className="font-mono font-black text-neutral-900">{t.id}</span>,
+    },
+    {
+      key: 'category',
+      header: 'Category',
+      priority: 'secondary',
+      cell: (t) => <span className="font-bold text-neutral-900">{t.category}</span>,
+    },
+    {
+      key: 'description',
+      header: 'Description',
+      priority: 'secondary',
+      cell: (t) => <span className="text-neutral-600 truncate max-w-xs block">{t.description}</span>,
+    },
+    {
+      key: 'priority',
+      header: 'Priority',
+      priority: 'secondary',
+      cell: (t) => getPriorityBadge(t.priority),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      priority: 'secondary',
+      cell: (t) => getStatusBadge(t.status),
+    },
+    {
+      key: 'submitted',
+      header: 'Submitted',
+      priority: 'secondary',
+      cell: (t) => <span className="text-[11px] text-neutral-500">{formatDate(t.createdAt)}</span>,
+    },
+    {
+      key: 'actions',
+      header: 'Action',
+      priority: 'optional',
+      align: 'right',
+      cell: (t) => (
+        <button
+          onClick={() => setSelectedTicket(t)}
+          className="rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-[11px] font-bold text-neutral-900 hover:bg-neutral-50 shadow-2xs"
+        >
+          View Status
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -162,65 +220,15 @@ export function ResellerSupportView({ onNavigate }: ResellerSupportViewProps) {
       </div>
 
       {/* Ticket List */}
-      {filteredTickets.length === 0 ? (
-        <EmptyState
-          icon={LifeBuoy}
-          title="No Support Tickets Found"
-          description="You haven't submitted any support tickets yet or none match your search."
-        />
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead className="border-b border-neutral-200 bg-neutral-50/80 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-                <tr>
-                  <th className="py-3 px-4">Ticket ID</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Description</th>
-                  <th className="py-3 px-4">Priority</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Submitted</th>
-                  <th className="py-3 px-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 text-xs text-neutral-800">
-                {filteredTickets.map((ticket) => (
-                  <tr key={ticket.id} className="hover:bg-neutral-50/80 transition-colors">
-                    <td className="py-3.5 px-4">
-                      <span className="font-mono font-black text-neutral-900">{ticket.id}</span>
-                    </td>
-
-                    <td className="py-3.5 px-4 font-bold text-neutral-900">
-                      {ticket.category}
-                    </td>
-
-                    <td className="py-3.5 px-4 max-w-xs truncate text-neutral-600">
-                      {ticket.description}
-                    </td>
-
-                    <td className="py-3.5 px-4">{getPriorityBadge(ticket.priority)}</td>
-
-                    <td className="py-3.5 px-4">{getStatusBadge(ticket.status)}</td>
-
-                    <td className="py-3.5 px-4 text-[11px] text-neutral-500">
-                      {formatDate(ticket.createdAt)}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => setSelectedTicket(ticket)}
-                        className="rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-[11px] font-bold text-neutral-900 hover:bg-neutral-50 shadow-2xs"
-                      >
-                        View Status
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <ResponsiveDataTable
+        data={filteredTickets}
+        columns={ticketColumns}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        showViewToggle={true}
+        emptyTitle="No Support Tickets Found"
+        emptyDescription="You haven't submitted any support tickets yet or none match your search."
+      />
 
       {/* SUBMIT TICKET MODAL */}
       <Modal

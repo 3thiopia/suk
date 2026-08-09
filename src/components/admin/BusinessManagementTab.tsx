@@ -4,6 +4,8 @@ import { storage } from '../../lib/storage';
 import { BusinessProfile, UserAccountStatus } from '../../types';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { Modal } from '../common/Modal';
+import { ResponsiveDataTable, Column } from '../common/ResponsiveDataTable';
+import { ViewMode } from '../common/ViewToggle';
 
 export function BusinessManagementTab() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -13,6 +15,9 @@ export function BusinessManagementTab() {
   const [actionReason, setActionReason] = useState('');
   const [banType, setBanType] = useState<'permanent' | 'temporary'>('permanent');
   const [suspensionEndDate, setSuspensionEndDate] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640 ? 'cards' : 'table'
+  );
 
   const businesses = storage.getBusinesses();
   const products = storage.getProducts();
@@ -52,6 +57,136 @@ export function BusinessManagementTab() {
     storage.toggleBusinessVerification(businessId);
   };
 
+  const businessColumns: Column<BusinessProfile>[] = [
+    {
+      key: 'brand',
+      header: 'Brand / Owner',
+      priority: 'primary',
+      cell: (b) => (
+        <div className="flex items-center gap-3">
+          <img src={b.logoUrl} alt={b.businessName} className="h-9 w-9 rounded-xl object-cover border shrink-0" />
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-neutral-900">{b.businessName}</span>
+              {b.isVerified && <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" title="Verified Brand" />}
+            </div>
+            <p className="text-[10px] text-neutral-400">{b.website}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'category',
+      header: 'Category',
+      priority: 'secondary',
+      cell: (b) => <span className="text-neutral-600 font-medium">{b.category}</span>,
+    },
+    {
+      key: 'products',
+      header: 'Products',
+      priority: 'secondary',
+      cell: (b) => {
+        const count = products.filter((p) => p.businessId === b.id).length;
+        return <span className="rounded-lg bg-neutral-100 px-2 py-1 font-mono font-bold text-neutral-800">{count} items</span>;
+      },
+    },
+    {
+      key: 'orders',
+      header: 'Total Orders',
+      priority: 'secondary',
+      cell: (b) => {
+        const count = orders.filter((o) => o.items.some((i) => i.businessId === b.id)).length;
+        return <span className="font-semibold">{count} orders</span>;
+      },
+    },
+    {
+      key: 'volume',
+      header: 'Gross Volume',
+      priority: 'secondary',
+      cell: (b) => {
+        const grossVolume = orders
+          .filter((o) => o.items.some((i) => i.businessId === b.id))
+          .reduce((sum, o) => sum + o.totalAmount, 0);
+        return <span className="font-bold text-emerald-700">{formatCurrency(grossVolume)}</span>;
+      },
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      priority: 'secondary',
+      cell: (b) => {
+        const currentStatus: UserAccountStatus = b.status || 'active';
+        return (
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+              currentStatus === 'active'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : currentStatus === 'suspended'
+                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                : 'bg-red-50 text-red-700 border border-red-200'
+            }`}
+          >
+            {currentStatus}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      header: 'Governance Actions',
+      priority: 'optional',
+      align: 'right',
+      cell: (b) => {
+        const currentStatus: UserAccountStatus = b.status || 'active';
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              onClick={() => handleToggleVerification(b.id)}
+              className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                b.isVerified ? 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+              }`}
+            >
+              {b.isVerified ? 'Unverify' : 'Verify Brand'}
+            </button>
+
+            {currentStatus === 'active' ? (
+              <button
+                onClick={() => {
+                  setSuspendModalBusiness(b);
+                  setActionReason('');
+                  setSuspensionEndDate('');
+                }}
+                className="rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 border border-amber-200 hover:bg-amber-100"
+              >
+                Suspend
+              </button>
+            ) : (
+              <button
+                onClick={() => handleReactivate(b)}
+                className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+              >
+                Reactivate
+              </button>
+            )}
+
+            {currentStatus !== 'banned' && (
+              <button
+                onClick={() => {
+                  setBanModalBusiness(b);
+                  setActionReason('');
+                  setBanType('permanent');
+                }}
+                className="rounded-lg bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 border border-red-200 hover:bg-red-100"
+              >
+                Ban
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header & Filter Controls */}
@@ -90,120 +225,16 @@ export function BusinessManagementTab() {
         </div>
       </div>
 
-      {/* Business Table */}
-      <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xs">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead className="border-b border-neutral-200 bg-neutral-50/80 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-            <tr>
-              <th className="py-3.5 px-4">Brand / Owner</th>
-              <th className="py-3.5 px-4">Category</th>
-              <th className="py-3.5 px-4">Products</th>
-              <th className="py-3.5 px-4">Total Orders</th>
-              <th className="py-3.5 px-4">Gross Volume</th>
-              <th className="py-3.5 px-4">Status</th>
-              <th className="py-3.5 px-4 text-right">Governance Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100 text-neutral-800">
-            {filtered.map((b) => {
-              const bProducts = products.filter((p) => p.businessId === b.id);
-              const bOrders = orders.filter((o) => o.items.some((i) => i.businessId === b.id));
-              const grossVolume = bOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-
-              const currentStatus: UserAccountStatus = b.status || 'active';
-
-              return (
-                <tr key={b.id} className="hover:bg-neutral-50 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-3">
-                      <img src={b.logoUrl} alt={b.businessName} className="h-9 w-9 rounded-xl object-cover border" />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-neutral-900">{b.businessName}</span>
-                          {b.isVerified && <ShieldCheck className="h-4 w-4 text-emerald-600" title="Verified Brand" />}
-                        </div>
-                        <p className="text-[10px] text-neutral-400">{b.website}</p>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="py-3.5 px-4 text-neutral-600 font-medium">{b.category}</td>
-
-                  <td className="py-3.5 px-4">
-                    <span className="rounded-lg bg-neutral-100 px-2 py-1 font-mono font-bold text-neutral-800">
-                      {bProducts.length} items
-                    </span>
-                  </td>
-
-                  <td className="py-3.5 px-4 font-semibold">{bOrders.length} orders</td>
-
-                  <td className="py-3.5 px-4 font-bold text-emerald-700">{formatCurrency(grossVolume)}</td>
-
-                  <td className="py-3.5 px-4">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                        currentStatus === 'active'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : currentStatus === 'suspended'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : 'bg-red-50 text-red-700 border border-red-200'
-                      }`}
-                    >
-                      {currentStatus}
-                    </span>
-                  </td>
-
-                  <td className="py-3.5 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => handleToggleVerification(b.id)}
-                        className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-colors ${
-                          b.isVerified ? 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                        }`}
-                      >
-                        {b.isVerified ? 'Unverify' : 'Verify Brand'}
-                      </button>
-
-                      {currentStatus === 'active' ? (
-                        <button
-                          onClick={() => {
-                            setSuspendModalBusiness(b);
-                            setActionReason('');
-                            setSuspensionEndDate('');
-                          }}
-                          className="rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 border border-amber-200 hover:bg-amber-100"
-                        >
-                          Suspend
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleReactivate(b)}
-                          className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-                        >
-                          Reactivate
-                        </button>
-                      )}
-
-                      {currentStatus !== 'banned' && (
-                        <button
-                          onClick={() => {
-                            setBanModalBusiness(b);
-                            setActionReason('');
-                            setBanType('permanent');
-                          }}
-                          className="rounded-lg bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 border border-red-200 hover:bg-red-100"
-                        >
-                          Ban
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {/* Responsive Business Data Table */}
+      <ResponsiveDataTable
+        data={filtered}
+        columns={businessColumns}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        showViewToggle={true}
+        emptyTitle="No Businesses Found"
+        emptyDescription="No brand or supplier business matches your criteria."
+      />
 
       {/* Ban Business Modal */}
       {banModalBusiness && (

@@ -33,23 +33,52 @@ export function Badge({ children, variant = 'default', className }: BadgeProps) 
   );
 }
 
-export function OrderStatusBadge({ status }: { status: OrderStatus }) {
-  switch (status) {
-    case 'pending':
-      return <Badge variant="amber">Pending Approval</Badge>;
-    case 'accepted':
-      return <Badge variant="info">Accepted</Badge>;
-    case 'shipped':
-      return <Badge variant="purple">Shipped</Badge>;
-    case 'delivered':
-    case 'completed':
-      return <Badge variant="success">{status.toUpperCase()}</Badge>;
-    case 'rejected':
-    case 'cancelled':
-      return <Badge variant="danger">{status.toUpperCase()}</Badge>;
-    default:
-      return <Badge variant="default">{status}</Badge>;
-  }
+export function OrderStatusBadge({ status, className }: { status: OrderStatus; className?: string }) {
+  const getDotColor = (s: OrderStatus) => {
+    switch (s) {
+      case 'pending': return 'bg-amber-500';
+      case 'accepted': return 'bg-blue-500';
+      case 'shipped': return 'bg-purple-500';
+      case 'delivered':
+      case 'completed': return 'bg-emerald-500';
+      case 'rejected':
+      case 'cancelled': return 'bg-rose-500';
+      default: return 'bg-neutral-500';
+    }
+  };
+
+  const getLabel = (s: OrderStatus) => {
+    switch (s) {
+      case 'pending': return 'Pending';
+      case 'accepted': return 'Accepted';
+      case 'shipped': return 'Shipped';
+      case 'delivered': return 'Delivered';
+      case 'completed': return 'Completed';
+      case 'rejected': return 'Rejected';
+      case 'cancelled': return 'Cancelled';
+      default: return s;
+    }
+  };
+
+  const getVariant = (s: OrderStatus) => {
+    switch (s) {
+      case 'pending': return 'amber';
+      case 'accepted': return 'info';
+      case 'shipped': return 'purple';
+      case 'delivered':
+      case 'completed': return 'success';
+      case 'rejected':
+      case 'cancelled': return 'danger';
+      default: return 'default';
+    }
+  };
+
+  return (
+    <Badge variant={getVariant(status)} className={cn("font-bold tracking-tight gap-1.5 shadow-2xs py-0.5 px-2.5", className)}>
+      <span className={cn("h-2 w-2 rounded-full shrink-0 animate-pulse", getDotColor(status))} />
+      <span>{getLabel(status)}</span>
+    </Badge>
+  );
 }
 
 export function ProductStatusBadge({ status, isHidden }: { status?: ProductStatus; isHidden?: boolean }) {

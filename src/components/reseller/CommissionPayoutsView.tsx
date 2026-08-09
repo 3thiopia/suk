@@ -4,6 +4,8 @@ import { storage } from '../../lib/storage';
 import { formatCurrency, formatDate, formatShortDate } from '../../lib/utils';
 import { StatCard } from '../common/StatCard';
 import { Badge } from '../common/Badge';
+import { ResponsiveDataTable, Column } from '../common/ResponsiveDataTable';
+import { ViewMode } from '../common/ViewToggle';
 
 export function CommissionPayoutsView() {
   const currentUser = storage.getCurrentUser();
@@ -12,6 +14,9 @@ export function CommissionPayoutsView() {
   const [threshold, setThreshold] = useState(storefront?.minPayoutThreshold || 50.00);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640 ? 'cards' : 'table'
+  );
 
   if (!storefront) return null;
 
@@ -33,6 +38,39 @@ export function CommissionPayoutsView() {
   };
 
   const isEligibleForNextBatch = storefront.pendingPayout >= storefront.minPayoutThreshold;
+
+  const payoutColumns: Column<any>[] = [
+    {
+      key: 'id',
+      header: 'Payout ID',
+      priority: 'primary',
+      cell: (p) => <span className="font-mono font-bold text-neutral-900">#{p.id}</span>,
+    },
+    {
+      key: 'period',
+      header: 'Period',
+      priority: 'secondary',
+      cell: (p) => <span className="text-neutral-600">{p.periodStart} to {p.periodEnd}</span>,
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      priority: 'secondary',
+      cell: (p) => <span className="font-extrabold text-emerald-700">{formatCurrency(p.amount)}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      priority: 'secondary',
+      cell: () => <Badge variant="success">PROCESSED</Badge>,
+    },
+    {
+      key: 'date',
+      header: 'Transfer Date',
+      priority: 'secondary',
+      cell: (p) => <span className="text-neutral-500">{formatDate(p.payoutDate)}</span>,
+    },
+  ];
 
   return (
     <div className="space-y-8">
@@ -120,37 +158,16 @@ export function CommissionPayoutsView() {
 
       {/* Payout History Table */}
       <div className="space-y-4">
-        <h3 className="text-sm font-bold text-neutral-900">Payout History</h3>
-        <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xs">
-          {payouts.length === 0 ? (
-            <div className="p-8 text-center text-xs text-neutral-500">No monthly payouts processed yet.</div>
-          ) : (
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="border-b border-neutral-200 bg-neutral-50/70 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-                <tr>
-                  <th className="py-3 px-4">Payout ID</th>
-                  <th className="py-3 px-4">Period</th>
-                  <th className="py-3 px-4">Amount</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Transfer Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 text-neutral-800">
-                {payouts.map((p) => (
-                  <tr key={p.id} className="hover:bg-neutral-50 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-neutral-900">#{p.id}</td>
-                    <td className="py-3 px-4 text-neutral-600">{p.periodStart} to {p.periodEnd}</td>
-                    <td className="py-3 px-4 font-extrabold text-emerald-700">{formatCurrency(p.amount)}</td>
-                    <td className="py-3 px-4">
-                      <Badge variant="success">PROCESSED</Badge>
-                    </td>
-                    <td className="py-3 px-4 text-neutral-500">{formatDate(p.payoutDate)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <ResponsiveDataTable
+          title="Payout History"
+          data={payouts}
+          columns={payoutColumns}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          showViewToggle={true}
+          emptyTitle="No Payout History"
+          emptyDescription="No monthly payouts processed yet."
+        />
       </div>
     </div>
   );

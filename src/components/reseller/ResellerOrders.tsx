@@ -404,104 +404,123 @@ export function ResellerOrders() {
               return (
                 <div
                   key={order.id}
-                  className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-xs space-y-3 transition-all"
+                  className="rounded-2xl border border-neutral-200 bg-white shadow-xs overflow-hidden transition-all hover:border-neutral-300"
                 >
-                  {/* Top Bar: Order Ref & Status */}
-                  <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
-                    <div>
-                      <span className="font-mono font-bold text-neutral-900 text-xs">#{order.id}</span>
-                      <p className="text-[10px] text-neutral-400">{formatDate(order.createdAt)}</p>
+                  {/* Collapsed Header - Always Visible */}
+                  <div
+                    onClick={() => toggleExpandCard(order.id)}
+                    className="p-3.5 cursor-pointer hover:bg-neutral-50/60 transition-colors select-none"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono font-bold text-neutral-900 text-xs">#{order.id}</span>
+                        <span className="text-[10px] text-neutral-400 truncate">• {formatDate(order.createdAt)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <OrderStatusBadge status={order.status} />
+                        <button
+                          type="button"
+                          aria-label={isExpanded ? "Collapse order" : "Expand order"}
+                          className="p-1 rounded-lg bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900 transition-colors"
+                        >
+                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
-                    <OrderStatusBadge status={order.status} />
+
+                    {/* Product Title in Collapsed Header */}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-neutral-900 truncate">
+                          {order.items[0]?.productTitle || 'Storefront Item'}
+                          {order.items.length > 1 && (
+                            <span className="text-[11px] font-semibold text-neutral-500 ml-1.5">
+                              (+{order.items.length - 1} item{order.items.length > 2 ? 's' : ''})
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-neutral-500 mt-0.5">
+                          Total: <strong className="text-neutral-900 font-extrabold">{formatCurrency(order.totalAmount)}</strong> • Comm: <strong className="text-emerald-700 font-extrabold">{formatCurrency(order.resellerCommission)}</strong>
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Product */}
-                  <div className="space-y-2">
-                    {order.items.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-3 bg-neutral-50/70 p-2.5 rounded-xl border border-neutral-100">
-                        <img
-                          src={item.coverImage}
-                          alt={item.productTitle}
-                          className="h-10 w-10 rounded-lg object-cover border border-neutral-200 shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-neutral-900 truncate">{item.productTitle}</p>
-                          <p className="text-[10px] text-neutral-500">Qty: {item.quantity} • {formatCurrency(item.unitPrice)}</p>
+                  {/* Expanded Content Section */}
+                  {isExpanded && (
+                    <div className="border-t border-neutral-100 p-3.5 space-y-3 bg-neutral-50/30 animate-fadeIn">
+                      {/* Product details */}
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Ordered Items</p>
+                        {order.items.map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-neutral-200/80 shadow-2xs">
+                            <img
+                              src={item.coverImage}
+                              alt={item.productTitle}
+                              className="h-10 w-10 rounded-lg object-cover border border-neutral-200 shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-neutral-900 truncate">{item.productTitle}</p>
+                              <p className="text-[10px] text-neutral-500">Qty: {item.quantity} • {formatCurrency(item.unitPrice)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Business Owner */}
+                      <div className="rounded-xl border border-neutral-200/80 bg-white p-2.5 flex items-center justify-between text-xs shadow-2xs">
+                        <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Business Owner</span>
+                        <span className="font-bold text-neutral-900 flex items-center gap-1">
+                          <Building2 className="h-3.5 w-3.5 text-neutral-500" />
+                          {brandOwner}
+                        </span>
+                      </div>
+
+                      {/* Pricing & Commission Breakdown */}
+                      <div className="rounded-xl border border-neutral-200/80 bg-white p-3 flex items-center justify-between text-xs shadow-2xs">
+                        <div>
+                          <span className="text-[10px] text-neutral-400 block uppercase tracking-wider font-bold">Total Price</span>
+                          <span className="font-extrabold text-neutral-900 text-sm">{formatCurrency(order.totalAmount)}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] text-neutral-400 block uppercase tracking-wider font-bold">Your Commission</span>
+                          <span className="font-extrabold text-emerald-700 text-xs">{formatCurrency(order.resellerCommission)}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Business Owner */}
-                  <div className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-2.5 flex items-center justify-between text-xs">
-                    <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Business Owner</span>
-                    <span className="font-bold text-neutral-900 flex items-center gap-1">
-                      <Building2 className="h-3.5 w-3.5 text-neutral-500" />
-                      {brandOwner}
-                    </span>
-                  </div>
-
-                  {/* Pricing & Commission */}
-                  <div className="flex items-center justify-between text-xs pt-1">
-                    <div>
-                      <span className="text-[10px] text-neutral-400 block uppercase tracking-wider">Total Price</span>
-                      <span className="font-extrabold text-neutral-900 text-sm">{formatCurrency(order.totalAmount)}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-neutral-400 block uppercase tracking-wider">Commission</span>
-                      <span className="font-extrabold text-emerald-700 text-xs">{formatCurrency(order.resellerCommission)}</span>
-                    </div>
-                  </div>
-
-                  {/* Report Status Banner if existing report */}
-                  {existingReport && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs flex items-center gap-2 text-amber-900 font-bold">
-                      <ShieldAlert className="h-4 w-4 text-amber-700 shrink-0" />
-                      <span>Issue Reported ({existingReport.status.replace(/_/g, ' ')})</span>
-                    </div>
-                  )}
-
-                  {/* Actions & Expand Details */}
-                  <div className="pt-2 border-t border-neutral-100 flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => toggleExpandCard(order.id)}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-neutral-600 hover:text-neutral-900 py-1.5 px-2 rounded-lg bg-neutral-100"
-                    >
-                      {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                      <span>{isExpanded ? 'Less Info' : 'View Details'}</span>
-                    </button>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => setActiveOrder(order)}
-                        className="rounded-xl border border-neutral-200 bg-white p-2 text-neutral-700 hover:bg-neutral-100"
-                        title="View Receipt"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-
-                      <button
-                        onClick={() => setReportingOrder(order)}
-                        className="flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 px-2.5 py-1.5 text-xs font-bold"
-                      >
-                        <ShieldAlert className="h-3.5 w-3.5 text-red-600" />
-                        <span>Report</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Expandable Details */}
-                  {isExpanded && (
-                    <div className="pt-2 border-t border-neutral-100 space-y-2 text-xs text-neutral-700 animate-fadeIn">
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-500">Order Ref:</span>
-                        <span className="font-mono font-semibold text-neutral-900">#{order.id}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-500">Payout Eligibility:</span>
+                      {/* Payout Eligibility */}
+                      <div className="flex items-center justify-between text-xs px-1">
+                        <span className="text-neutral-500">Payout Status:</span>
                         <span className="font-bold text-emerald-700">
-                          {order.status === 'delivered' || order.commissionEligibleForPayout ? 'Eligible for Payout' : 'Pending Delivery'}
+                          {order.status === 'delivered' || order.status === 'completed' || order.commissionEligibleForPayout ? 'Eligible for Payout' : 'Pending Delivery'}
                         </span>
+                      </div>
+
+                      {/* Report Banner */}
+                      {existingReport && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs flex items-center gap-2 text-amber-900 font-bold">
+                          <ShieldAlert className="h-4 w-4 text-amber-700 shrink-0" />
+                          <span>Issue Reported ({existingReport.status.replace(/_/g, ' ')})</span>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="pt-2 border-t border-neutral-200/60 flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setActiveOrder(order)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-100 transition-colors shadow-2xs"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          <span>View Receipt</span>
+                        </button>
+
+                        <button
+                          onClick={() => setReportingOrder(order)}
+                          className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1.5 text-xs font-bold transition-colors shadow-2xs"
+                        >
+                          <ShieldAlert className="h-3.5 w-3.5 text-red-600" />
+                          <span>Report Issue</span>
+                        </button>
                       </div>
                     </div>
                   )}

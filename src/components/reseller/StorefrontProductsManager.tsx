@@ -7,6 +7,8 @@ import { getProductCommission } from '../../lib/commission';
 import { Modal } from '../common/Modal';
 import { EmptyState } from '../common/EmptyState';
 import { SingleImageUploader } from '../common/SingleImageUploader';
+import { ResponsiveDataTable, Column } from '../common/ResponsiveDataTable';
+import { ViewToggle, ViewMode } from '../common/ViewToggle';
 
 interface StorefrontProductsManagerProps {
   onNavigate: (path: string) => void;
