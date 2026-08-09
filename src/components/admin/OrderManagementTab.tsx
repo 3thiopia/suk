@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { CompactFilterSection, FilterChip } from '../common/CompactFilterSection';
 import {
   ShoppingBag,
   Search,
@@ -139,50 +140,36 @@ export function OrderManagementTab({ initialOrderId }: OrderManagementTabProps) 
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
-            <input
-              type="text"
-              placeholder="Search order ref, buyer name/phone, owner name/phone, storefront..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2 pl-9 pr-3 text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:border-neutral-900 transition-colors"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            {/* Status Filter */}
-            <div className="relative flex-1 sm:flex-none">
-              <select
-                value={selectedStatus}
-                onChange={(e) => {
-                  setSelectedStatus(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full sm:w-auto appearance-none rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2 pr-8 text-xs font-semibold text-neutral-700 focus:bg-white focus:outline-none focus:border-neutral-900 transition-colors cursor-pointer"
-              >
-                <option value="all">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="accepted">Accepted</option>
-                <option value="shipped">Shipped</option>
-                <option value="delivered">Delivered</option>
-                <option value="completed">Completed</option>
-                <option value="rejected">Rejected</option>
-              </select>
-              <ListFilter className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
-            </div>
-
-            {/* Sort Dropdown */}
-            <div className="relative flex-1 sm:flex-none">
+        <CompactFilterSection
+          searchQuery={searchTerm}
+          onSearchChange={(val) => {
+            setSearchTerm(val);
+            setCurrentPage(1);
+          }}
+          searchPlaceholder="Search order ref, buyer name/phone, owner name/phone, storefront..."
+          activeCount={selectedStatus !== 'all' ? 1 : 0}
+          activeChips={selectedStatus !== 'all' ? [{
+            id: 'status',
+            label: `Status: ${selectedStatus.toUpperCase()}`,
+            onRemove: () => {
+              setSelectedStatus('all');
+              setCurrentPage(1);
+            }
+          }] : []}
+          resultsCount={filteredOrders.length}
+          resultsLabel="orders"
+          onResetAll={() => {
+            setSelectedStatus('all');
+            setSearchTerm('');
+            setCurrentPage(1);
+          }}
+          sortControl={
+            <div className="flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-xs font-semibold text-neutral-800 w-full sm:w-auto">
+              <ArrowUpDown className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="w-full sm:w-auto appearance-none rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2 pr-8 text-xs font-semibold text-neutral-700 focus:bg-white focus:outline-none focus:border-neutral-900 transition-colors cursor-pointer"
+                className="bg-transparent font-semibold text-neutral-800 focus:outline-none text-xs w-full cursor-pointer"
               >
                 <option value="date_desc">Newest First</option>
                 <option value="date_asc">Oldest First</option>
@@ -190,10 +177,30 @@ export function OrderManagementTab({ initialOrderId }: OrderManagementTabProps) 
                 <option value="total_asc">Lowest Amount</option>
                 <option value="comm_desc">Highest Commission</option>
               </select>
-              <ArrowUpDown className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
             </div>
+          }
+        >
+          {/* Status Filter */}
+          <div className="space-y-1 w-full sm:w-auto">
+            <label className="block text-[11px] font-bold text-neutral-400 uppercase sm:hidden">Order Status</label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full sm:w-auto rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-800 focus:bg-white focus:outline-none focus:border-neutral-900 cursor-pointer"
+            >
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="accepted">Accepted</option>
+              <option value="shipped">Shipped</option>
+              <option value="delivered">Delivered</option>
+              <option value="completed">Completed</option>
+              <option value="rejected">Rejected</option>
+            </select>
           </div>
-        </div>
+        </CompactFilterSection>
       </div>
 
       {/* Orders Content */}

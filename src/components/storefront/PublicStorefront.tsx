@@ -420,7 +420,9 @@ export function PublicStorefront({
               </div>
 
               <div className="flex items-center gap-3">
-                <LanguageSwitcher className="hidden md:inline-block" />
+                <div className="hidden md:block">
+                  <LanguageSwitcher />
+                </div>
                 <SocialLinksDisplay storefrontId={storefront.id} targetPlacement="header" customization={customization} className="hidden lg:flex" />
                 <button
                   onClick={onOpenCart}

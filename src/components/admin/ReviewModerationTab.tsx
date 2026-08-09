@@ -115,9 +115,9 @@ export const ReviewModerationTab: React.FC = () => {
       </div>
 
       {/* Tabs & Search Filter */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Filter Buttons */}
-        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto max-w-full shrink-0 whitespace-nowrap">
           <button
             onClick={() => setActiveFilter('all')}
             className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all ${

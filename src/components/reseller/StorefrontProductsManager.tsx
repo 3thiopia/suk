@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, Eye, EyeOff, MoveUp, MoveDown, Trash2, Image as ImageIcon, Check, FolderPlus, Lock, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { Layers, Eye, EyeOff, MoveUp, MoveDown, Trash2, Image as ImageIcon, Check, FolderPlus, Lock, LayoutGrid, Table as TableIcon, Plus } from 'lucide-react';
 import { storage } from '../../lib/storage';
 import { StorefrontProduct, Product } from '../../types';
 import { formatCurrency } from '../../lib/utils';
@@ -78,45 +78,59 @@ export function StorefrontProductsManager({ onNavigate }: StorefrontProductsMana
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      {/* Header & Primary Action */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-neutral-900">Storefront Items & Presentation Manager</h1>
           <p className="text-xs text-neutral-500">
             Control which cover photo displays first, reorder items, hide/show products, and organize into custom collections.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* View Toggle Switcher */}
-          <div className="flex items-center rounded-xl border border-neutral-200 bg-neutral-100 p-1 shadow-2xs">
-            <button
-              onClick={() => handleSetViewMode('card')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                viewMode === 'card'
-                  ? 'bg-white text-neutral-900 shadow-2xs border border-neutral-200'
-                  : 'text-neutral-500 hover:text-neutral-900'
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              <span>Card View</span>
-            </button>
-            <button
-              onClick={() => handleSetViewMode('table')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                viewMode === 'table'
-                  ? 'bg-white text-neutral-900 shadow-2xs border border-neutral-200'
-                  : 'text-neutral-500 hover:text-neutral-900'
-              }`}
-            >
-              <TableIcon className="h-3.5 w-3.5" />
-              <span>Table View</span>
-            </button>
-          </div>
 
+        {/* Primary Action Button */}
+        <button
+          type="button"
+          onClick={() => onNavigate('/reseller/library')}
+          className="hidden sm:inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-neutral-800 active:scale-98 shrink-0"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Add More Products</span>
+        </button>
+      </div>
+
+      {/* Control Bar with View Mode Toggle */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white p-3 shadow-2xs">
+        <span className="text-xs font-semibold text-neutral-600">
+          Total Storefront Items: <strong className="text-neutral-900">{sProducts.length}</strong>
+        </span>
+
+        {/* View Toggle Segmented Control */}
+        <div className="inline-flex items-center rounded-xl border border-neutral-200 bg-neutral-100 p-1 shadow-2xs shrink-0">
           <button
-            onClick={() => onNavigate('/reseller/library')}
-            className="inline-flex items-center gap-2 rounded-xl bg-neutral-900 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-neutral-800"
+            type="button"
+            onClick={() => handleSetViewMode('card')}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
+              viewMode === 'card'
+                ? 'bg-white text-neutral-900 shadow-2xs border border-neutral-200/80'
+                : 'text-neutral-500 hover:text-neutral-900'
+            }`}
+            title="Card View"
           >
-            Add More Products
+            <LayoutGrid className="h-3.5 w-3.5" />
+            <span>Cards</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSetViewMode('table')}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
+              viewMode === 'table'
+                ? 'bg-white text-neutral-900 shadow-2xs border border-neutral-200/80'
+                : 'text-neutral-500 hover:text-neutral-900'
+            }`}
+            title="Table View"
+          >
+            <TableIcon className="h-3.5 w-3.5" />
+            <span>Table</span>
           </button>
         </div>
       </div>

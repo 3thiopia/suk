@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { CompactFilterSection, FilterChip } from '../common/CompactFilterSection';
 import {
   ShoppingBag,
   CheckCircle,
@@ -238,120 +239,105 @@ export function BusinessOrders() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">Brand Fulfillment Orders</h1>
-          <p className="text-xs sm:text-sm text-neutral-500 mt-1">
-            Review customer orders placed via reseller storefronts, with complete financial summaries and owner net profit tracking.
-          </p>
-        </div>
-
-        {/* View Switcher Toggle */}
-        <div className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-neutral-100 p-1 self-start sm:self-auto">
-          <button
-            onClick={() => setViewMode('cards')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-              viewMode === 'cards'
-                ? 'bg-white text-neutral-900 shadow-2xs'
-                : 'text-neutral-600 hover:text-neutral-900'
-            }`}
-            title="Card View"
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            <span>Cards</span>
-          </button>
-          <button
-            onClick={() => setViewMode('table')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-              viewMode === 'table'
-                ? 'bg-white text-neutral-900 shadow-2xs'
-                : 'text-neutral-600 hover:text-neutral-900'
-            }`}
-            title="Table View"
-          >
-            <Table className="h-3.5 w-3.5" />
-            <span>Table</span>
-          </button>
-        </div>
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">Brand Fulfillment Orders</h1>
+        <p className="text-xs sm:text-sm text-neutral-500 mt-1">
+          Review customer orders placed via reseller storefronts, with complete financial summaries and owner net profit tracking.
+        </p>
       </div>
 
       {/* Filter, Search & Sort Bar */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-3.5 sm:p-4 shadow-2xs">
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
-            <input
-              type="text"
-              placeholder="Search Order ID, customer, phone, storefront, product..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2 pl-9 pr-3 text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:border-neutral-900 transition-colors"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            {/* Status Filter */}
-            <div className="relative flex-1 sm:flex-none">
-              <select
-                value={selectedStatus}
-                onChange={(e) => {
-                  setSelectedStatus(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full sm:w-auto appearance-none rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2 pr-8 text-xs font-semibold text-neutral-700 focus:bg-white focus:outline-none focus:border-neutral-900 transition-colors cursor-pointer"
-              >
-                <option value="all">All Statuses</option>
-                <option value="pending">Pending Approval</option>
-                <option value="accepted">Accepted</option>
-                <option value="shipped">Shipped</option>
-                <option value="delivered">Delivered</option>
-                <option value="completed">Completed</option>
-                <option value="rejected">Rejected</option>
-              </select>
-              <ListFilter className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
-            </div>
-
-            {/* Sort Dropdown */}
-            <div className="relative flex-1 sm:flex-none">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="w-full sm:w-auto appearance-none rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2 pr-8 text-xs font-semibold text-neutral-700 focus:bg-white focus:outline-none focus:border-neutral-900 transition-colors cursor-pointer"
-              >
-                <option value="date_desc">Newest First</option>
-                <option value="date_asc">Oldest First</option>
-                <option value="total_desc">Highest Total</option>
-                <option value="total_asc">Lowest Total</option>
-                <option value="customer_asc">Customer (A-Z)</option>
-              </select>
-              <ArrowUpDown className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
-            </div>
-          </div>
-        </div>
-
-        {/* Active Filters Summary */}
-        <div className="flex items-center justify-between text-[11px] text-neutral-500 px-0.5 pt-1 border-t border-neutral-100">
-          <span>
-            Showing <strong className="text-neutral-900">{sortedOrders.length}</strong> {sortedOrders.length === 1 ? 'order' : 'orders'}
-          </span>
-          {(selectedStatus !== 'all' || searchQuery) && (
+      <CompactFilterSection
+        searchQuery={searchQuery}
+        onSearchChange={(val) => {
+          setSearchQuery(val);
+          setCurrentPage(1);
+        }}
+        searchPlaceholder="Search Order ID, customer, phone, storefront..."
+        activeCount={selectedStatus !== 'all' ? 1 : 0}
+        activeChips={selectedStatus !== 'all' ? [{
+          id: 'status',
+          label: `Status: ${selectedStatus.toUpperCase()}`,
+          onRemove: () => {
+            setSelectedStatus('all');
+            setCurrentPage(1);
+          }
+        }] : []}
+        resultsCount={sortedOrders.length}
+        resultsLabel="orders"
+        onResetAll={() => {
+          setSelectedStatus('all');
+          setSearchQuery('');
+          setCurrentPage(1);
+        }}
+        rightControls={
+          <div className="inline-flex items-center rounded-xl border border-neutral-200 bg-neutral-100 p-1 shadow-2xs shrink-0">
             <button
-              onClick={() => {
-                setSelectedStatus('all');
-                setSearchQuery('');
-                setCurrentPage(1);
-              }}
-              className="text-neutral-700 hover:text-neutral-900 font-bold underline cursor-pointer"
+              type="button"
+              onClick={() => setViewMode('cards')}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'cards'
+                  ? 'bg-white text-neutral-900 shadow-2xs border border-neutral-200/80'
+                  : 'text-neutral-600 hover:text-neutral-900'
+              }`}
+              title="Card View"
             >
-              Reset Filters
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span>Cards</span>
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'table'
+                  ? 'bg-white text-neutral-900 shadow-2xs border border-neutral-200/80'
+                  : 'text-neutral-600 hover:text-neutral-900'
+              }`}
+              title="Table View"
+            >
+              <Table className="h-3.5 w-3.5" />
+              <span>Table</span>
+            </button>
+          </div>
+        }
+        sortControl={
+          <div className="flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-xs font-semibold text-neutral-800 w-full sm:w-auto">
+            <ArrowUpDown className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="bg-transparent font-semibold text-neutral-800 focus:outline-none text-xs w-full cursor-pointer"
+            >
+              <option value="date_desc">Newest First</option>
+              <option value="date_asc">Oldest First</option>
+              <option value="total_desc">Highest Total</option>
+              <option value="total_asc">Lowest Total</option>
+              <option value="customer_asc">Customer (A-Z)</option>
+            </select>
+          </div>
+        }
+      >
+        {/* Status Filter */}
+        <div className="space-y-1 w-full sm:w-auto">
+          <label className="block text-[11px] font-bold text-neutral-400 uppercase sm:hidden">Order Status</label>
+          <select
+            value={selectedStatus}
+            onChange={(e) => {
+              setSelectedStatus(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full sm:w-auto rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-800 focus:bg-white focus:outline-none focus:border-neutral-900 cursor-pointer"
+          >
+            <option value="all">All Statuses</option>
+            <option value="pending">Pending Approval</option>
+            <option value="accepted">Accepted</option>
+            <option value="shipped">Shipped</option>
+            <option value="delivered">Delivered</option>
+            <option value="completed">Completed</option>
+            <option value="rejected">Rejected</option>
+          </select>
         </div>
-      </div>
+      </CompactFilterSection>
 
       {/* Orders Content */}
       {sortedOrders.length === 0 ? (

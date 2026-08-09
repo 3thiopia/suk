@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Bell, CheckCheck, ShoppingBag, DollarSign, Package, AlertCircle, Sparkles, Building2, Store, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, CheckCheck, ShoppingBag, DollarSign, Package, AlertCircle, Sparkles, Building2, Store, ArrowRight, X } from 'lucide-react';
 import { storage } from '../../lib/storage';
 import { Notification, NotificationType } from '../../types';
 import { formatDate } from '../../lib/utils';
@@ -14,6 +14,16 @@ export function NotificationDropdown({ userId, onNavigate }: NotificationDropdow
   const [isOpen, setIsOpen] = useState(false);
   const notifications = storage.getNotifications(userId);
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   const handleItemClick = (n: Notification) => {
     storage.markNotificationAsRead(n.id);
@@ -61,15 +71,18 @@ export function NotificationDropdown({ userId, onNavigate }: NotificationDropdow
 
   return (
     <div className="relative">
+      {/* Compact, touch-friendly Notification Trigger Button */}
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
+        className="relative flex h-10 w-10 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-neutral-200/90 bg-white text-neutral-700 hover:bg-neutral-50 hover:text-neutral-900 active:scale-95 transition-all shadow-2xs focus:outline-none"
+        aria-label="Notifications"
         title="Notifications"
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-xs animate-pulse">
-            {unreadCount}
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
@@ -77,65 +90,95 @@ export function NotificationDropdown({ userId, onNavigate }: NotificationDropdow
       <AnimatePresence>
         {isOpen && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+            {/* Backdrop for tap-away */}
+            <div
+              className="fixed inset-0 z-40 bg-black/30 backdrop-blur-2xs sm:bg-transparent sm:backdrop-blur-none"
+              onClick={() => setIsOpen(false)}
+            />
+
+            {/* Notification Panel - Fixed full-width padded card on mobile, right-aligned dropdown on desktop */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 5 }}
+              initial={{ opacity: 0, scale: 0.95, y: -8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 5 }}
-              className="absolute right-0 z-50 mt-2 w-80 sm:w-96 overflow-hidden rounded-xl border border-neutral-200/90 bg-white shadow-xl ring-1 ring-black/5"
+              exit={{ opacity: 0, scale: 0.95, y: -8 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-x-3 top-16 z-50 max-w-md mx-auto sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-2xl ring-1 ring-black/5"
             >
-              <div className="flex items-center justify-between border-b border-neutral-100 bg-neutral-50/50 px-4 py-3">
+              {/* Panel Header */}
+              <div className="flex items-center justify-between border-b border-neutral-100 bg-neutral-50/80 px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-neutral-900">Notifications</span>
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-neutral-900">
+                    Notifications
+                  </span>
                   {unreadCount > 0 && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
                       {unreadCount} new
                     </span>
                   )}
                 </div>
-                {unreadCount > 0 && (
+
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => storage.markAllNotificationsAsRead(userId)}
+                      className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Mark all read</span>
+                    </button>
+                  )}
                   <button
-                    onClick={() => storage.markAllNotificationsAsRead(userId)}
-                    className="flex items-center gap-1 text-[11px] font-medium text-emerald-700 hover:underline"
+                    type="button"
+                    onClick={() => setIsOpen(false)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 transition-colors sm:hidden"
+                    aria-label="Close notifications"
                   >
-                    <CheckCheck className="h-3.5 w-3.5" />
-                    Mark all read
+                    <X className="h-4 w-4" />
                   </button>
-                )}
+                </div>
               </div>
 
-              <div className="max-h-80 overflow-y-auto divide-y divide-neutral-100">
+              {/* Notification Items List */}
+              <div className="max-h-[60vh] sm:max-h-80 overflow-y-auto divide-y divide-neutral-100 touch-pan-y">
                 {notifications.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-neutral-500">No notifications yet.</div>
+                  <div className="p-8 text-center text-xs font-medium text-neutral-500">
+                    No notifications yet.
+                  </div>
                 ) : (
                   notifications.map((n) => (
                     <div
                       key={n.id}
                       onClick={() => handleItemClick(n)}
                       className={`flex cursor-pointer items-start gap-3 p-3.5 text-xs transition-colors hover:bg-neutral-50 ${
-                        !n.read ? 'bg-emerald-50/30 font-medium' : ''
+                        !n.read ? 'bg-emerald-50/40 font-medium' : ''
                       }`}
                     >
-                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white border border-neutral-200 shadow-2xs">
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white border border-neutral-200/80 shadow-2xs">
                         {getIcon(n.type)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="truncate font-semibold text-neutral-900">{n.title}</p>
-                          <span className="text-[10px] text-neutral-400 shrink-0">{formatDate(n.createdAt)}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate font-bold text-neutral-900">{n.title}</p>
+                          <span className="text-[10px] text-neutral-400 shrink-0 font-medium">
+                            {formatDate(n.createdAt)}
+                          </span>
                         </div>
-                        <p className="mt-0.5 text-neutral-600 line-clamp-2 leading-snug">{n.message}</p>
+                        <p className="mt-0.5 text-neutral-600 line-clamp-2 leading-relaxed">
+                          {n.message}
+                        </p>
                       </div>
                     </div>
                   ))
                 )}
               </div>
 
-              {/* See All Notifications Footer */}
-              <div className="border-t border-neutral-100 bg-neutral-50/80 p-2 text-center">
+              {/* Footer: See All Notifications button */}
+              <div className="border-t border-neutral-100 bg-neutral-50/80 p-2.5 text-center">
                 <button
+                  type="button"
                   onClick={handleSeeAllNotifications}
-                  className="flex items-center justify-center gap-1.5 w-full rounded-lg py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100/60 hover:text-emerald-800 transition-colors"
+                  className="flex items-center justify-center gap-1.5 w-full rounded-xl py-2 px-3 text-xs font-bold text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/80 hover:text-emerald-800 transition-colors"
                 >
                   <span>See All Notifications</span>
                   <ArrowRight className="h-3.5 w-3.5" />

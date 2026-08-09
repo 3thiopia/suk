@@ -26,6 +26,8 @@ import {
   ChevronRight,
   Share2,
   Star,
+  Check,
+  Plus,
 } from 'lucide-react';
 import { storage } from '../../lib/storage';
 import { NotificationDropdown } from './NotificationDropdown';
@@ -129,29 +131,87 @@ export function Navbar({
     handleNavClick(homeRoute);
   };
 
-  const getMainDashboardRoute = () => {
-    return getHomeRoute(currentUser?.role, storage.isAuthenticated());
+  const getOrdersRoute = () => {
+    if (currentUser.role === 'reseller') return '/reseller/orders';
+    if (currentUser.role === 'business_owner') return '/orders';
+    return '/admin/orders';
   };
 
-  const getPrimaryCatalogRoute = () => {
-    if (currentUser.role === 'reseller') return '/marketplace';
+  const getProductsRoute = () => {
+    if (currentUser.role === 'reseller') return '/reseller/store-products';
     if (currentUser.role === 'business_owner') return '/products';
     return '/admin/products';
   };
 
-  const getPrimaryOrdersRoute = () => {
-    if (currentUser.role === 'reseller') return '/reseller/orders';
-    if (currentUser.role === 'business_owner') return '/orders';
-    return '/admin/orders';
+  const getAnalyticsRoute = () => {
+    if (currentUser.role === 'reseller') return '/reseller/analytics';
+    if (currentUser.role === 'business_owner') return '/analytics';
+    return '/admin/analytics';
+  };
+
+  const getSettingsRoute = () => {
+    if (currentUser.role === 'reseller') return '/reseller/settings';
+    if (currentUser.role === 'business_owner') return '/settings';
+    return '/admin/settings';
+  };
+
+  const isOrdersActive =
+    currentPath === getOrdersRoute() ||
+    currentPath.startsWith('/orders') ||
+    currentPath.startsWith('/business/orders') ||
+    currentPath.startsWith('/reseller/orders') ||
+    currentPath.startsWith('/admin/orders');
+
+  const isProductsActive =
+    currentPath === getProductsRoute() ||
+    currentPath.startsWith('/products') ||
+    currentPath.startsWith('/business/products') ||
+    currentPath.startsWith('/reseller/store-products') ||
+    currentPath.startsWith('/reseller/library') ||
+    currentPath.startsWith('/admin/products');
+
+  const isAnalyticsActive =
+    currentPath === getAnalyticsRoute() ||
+    currentPath.startsWith('/analytics') ||
+    currentPath.startsWith('/business/analytics') ||
+    currentPath.startsWith('/reseller/analytics') ||
+    currentPath === '/business' ||
+    currentPath === '/reseller';
+
+  const isSettingsActive =
+    currentPath === getSettingsRoute() ||
+    currentPath.startsWith('/settings') ||
+    currentPath.startsWith('/business/settings') ||
+    currentPath.startsWith('/reseller/settings') ||
+    currentPath.startsWith('/admin/settings');
+
+  const handleAddProductClick = () => {
+    if (currentUser.role === 'business_owner') {
+      if (currentPath !== '/products' && currentPath !== '/business/products') {
+        onNavigate('/products');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('open-add-product-modal'));
+        }, 150);
+      } else {
+        window.dispatchEvent(new CustomEvent('open-add-product-modal'));
+      }
+    } else if (currentUser.role === 'reseller') {
+      onNavigate('/reseller/library');
+    } else if (currentUser.role === 'admin') {
+      onNavigate('/admin/products');
+    } else {
+      onNavigate('/signin');
+    }
   };
 
   return (
     <>
       <header className="sticky top-0 z-40 w-full border-b border-neutral-200 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8">
-          {/* Left: Hamburger & Logo */}
+          {/* Left: Logo & Name */}
           <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
             <button
+              type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="lg:hidden flex h-9 w-9 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-700 hover:bg-neutral-100 focus:outline-none"
               aria-label="Toggle Menu"
@@ -192,72 +252,145 @@ export function Navbar({
           {/* Right Controls */}
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Language Switcher */}
-            <LanguageSwitcher className="hidden md:inline-block" />
+            <div className="hidden md:block">
+              <LanguageSwitcher />
+            </div>
 
             {/* Notification Dropdown */}
             <NotificationDropdown userId={currentUser.id} onNavigate={onNavigate} />
 
             {/* Role / User Switcher */}
             <div className="relative">
+              {/* Compact Mobile Profile Icon Button (Mobile view only) */}
               <button
+                type="button"
                 onClick={() => setIsUserSwitcherOpen(!isUserSwitcherOpen)}
-                className="flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white p-1 sm:p-1.5 sm:pl-2.5 text-xs font-bold text-neutral-800 shadow-2xs hover:bg-neutral-50"
+                className="flex sm:hidden h-10 w-10 items-center justify-center rounded-full border border-neutral-200/90 bg-white p-0.5 shadow-2xs hover:bg-neutral-50 active:scale-95 transition-all focus:outline-none ring-2 ring-emerald-500/20"
+                aria-label="Switch Profile"
+                title="Switch Profile"
               >
-                <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-6 w-6 rounded-full object-cover" />
-                <span className="hidden sm:inline max-w-[90px] truncate">{currentUser.name.split(' ')[0]}</span>
-                <span className="hidden xs:inline-block rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] uppercase text-neutral-600 font-extrabold">
-                  {currentUser.role === 'business_owner' ? 'Owner' : currentUser.role}
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.name}
+                  className="h-8 w-8 rounded-full object-cover"
+                />
+              </button>
+
+              {/* Tablet/Desktop Profile Switcher Button */}
+              <button
+                type="button"
+                onClick={() => setIsUserSwitcherOpen(!isUserSwitcherOpen)}
+                className="hidden sm:flex h-9 items-center gap-1.5 rounded-xl border border-neutral-200/90 bg-white p-1 px-2.5 text-xs font-bold text-neutral-800 shadow-2xs hover:bg-neutral-50 active:scale-95 transition-all focus:outline-none"
+                aria-label="Switch Profile"
+                title="Switch Profile"
+              >
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.name}
+                  className="h-6 w-6 rounded-full object-cover shrink-0 ring-1 ring-emerald-500/20"
+                />
+                <span className="max-w-[85px] truncate font-bold">
+                  {currentUser.name.split(' ')[0]}
                 </span>
-                <ChevronDown className="h-3.5 w-3.5 text-neutral-400" />
+                <span className="rounded-md bg-emerald-100/90 px-1.5 py-0.5 text-[10px] uppercase text-emerald-900 font-extrabold shrink-0">
+                  {currentUser.role === 'business_owner' ? 'Owner' : currentUser.role === 'reseller' ? 'Creator' : 'Admin'}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
               </button>
 
               {isUserSwitcherOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-neutral-200 bg-white p-2 shadow-xl z-50 space-y-1">
-                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                    Switch User / Role
-                  </div>
-                  {users.map((u) => (
-                    <button
-                      key={u.id}
-                      onClick={() => handleSelectUser(u)}
-                      className={`flex w-full items-center justify-between rounded-xl p-2 text-xs transition-colors ${
-                        u.id === currentUser.id ? 'bg-neutral-100 font-bold text-neutral-900' : 'hover:bg-neutral-50 text-neutral-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <img src={u.avatarUrl} alt={u.name} className="h-6 w-6 rounded-full object-cover" />
-                        <div className="text-left">
-                          <p className="font-bold">{u.name}</p>
-                          <p className="text-[10px] text-neutral-400">{u.email}</p>
-                        </div>
-                      </div>
-                      <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-[9px] uppercase font-bold text-neutral-700">
-                        {u.role === 'business_owner' ? 'Owner' : u.role === 'reseller' ? 'Reseller' : 'Admin'}
+                <>
+                  {/* Backdrop for mobile tap-away */}
+                  <div
+                    className="fixed inset-0 z-40 bg-black/30 backdrop-blur-2xs sm:bg-transparent sm:backdrop-blur-none"
+                    onClick={() => setIsUserSwitcherOpen(false)}
+                  />
+
+                  {/* Mobile-Friendly Profile Switcher Panel */}
+                  <div className="fixed inset-x-3 top-16 z-50 max-w-sm mx-auto sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-72 overflow-hidden rounded-2xl border border-neutral-200/90 bg-white p-3.5 shadow-2xl ring-1 ring-black/5 space-y-2">
+                    <div className="flex items-center justify-between border-b border-neutral-100 pb-2">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-400">
+                        Select Active Profile
                       </span>
-                    </button>
-                  ))}
+                      <button
+                        type="button"
+                        onClick={() => setIsUserSwitcherOpen(false)}
+                        className="flex h-6 w-6 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 transition-colors sm:hidden"
+                        aria-label="Close profile switcher"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
 
-                  <div className="my-1 border-t border-neutral-100" />
+                    <div className="space-y-1.5 max-h-[60vh] sm:max-h-80 overflow-y-auto">
+                      {users.map((u) => {
+                        const isActive = u.id === currentUser.id;
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => handleSelectUser(u)}
+                            className={`flex w-full items-center justify-between rounded-xl p-2.5 text-xs transition-all active:scale-98 ${
+                              isActive
+                                ? 'bg-emerald-50/90 border border-emerald-300/80 font-bold text-neutral-900 shadow-2xs'
+                                : 'border border-neutral-100 hover:bg-neutral-50 text-neutral-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 pr-1">
+                              <img
+                                src={u.avatarUrl}
+                                alt={u.name}
+                                className="h-8 w-8 rounded-full object-cover shrink-0 border border-neutral-200 shadow-2xs"
+                              />
+                              <div className="text-left truncate">
+                                <p className="font-bold text-neutral-900 truncate">{u.name}</p>
+                                <p className="text-[10px] text-neutral-500 truncate">{u.email}</p>
+                              </div>
+                            </div>
 
-                  <button
-                    onClick={() => {
-                      setIsUserSwitcherOpen(false);
-                      onNavigate('/');
-                    }}
-                    className="flex w-full items-center gap-2 rounded-xl p-2 text-xs font-bold text-neutral-700 hover:bg-neutral-100 transition-colors"
-                  >
-                    <Home className="h-4 w-4 text-emerald-600" />
-                    <span>Public Landing Page</span>
-                  </button>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span
+                                className={`rounded-md px-1.5 py-0.5 text-[9px] uppercase font-extrabold ${
+                                  isActive
+                                    ? 'bg-emerald-200/90 text-emerald-900'
+                                    : 'bg-neutral-100 text-neutral-600'
+                                }`}
+                              >
+                                {u.role === 'business_owner' ? 'Owner' : u.role === 'reseller' ? 'Reseller' : 'Admin'}
+                              </span>
+                              {isActive && <Check className="h-4 w-4 text-emerald-600 shrink-0" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                  <button
-                    onClick={handleSignOut}
-                    className="flex w-full items-center gap-2 rounded-xl p-2 text-xs font-bold text-rose-700 hover:bg-rose-50 transition-colors"
-                  >
-                    <Shield className="h-4 w-4 text-rose-500" />
-                    <span>Sign Out</span>
-                  </button>
-                </div>
+                    <div className="my-1 border-t border-neutral-100" />
+
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsUserSwitcherOpen(false);
+                          onNavigate('/');
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl p-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-100 transition-colors"
+                      >
+                        <Home className="h-4 w-4 text-emerald-600" />
+                        <span>Public Landing Page</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        className="flex w-full items-center gap-2.5 rounded-xl p-2.5 text-xs font-bold text-rose-700 hover:bg-rose-50 transition-colors"
+                      >
+                        <Shield className="h-4 w-4 text-rose-500" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -305,8 +438,12 @@ export function Navbar({
                 </div>
               </div>
               <button
-                onClick={() => setIsUserSwitcherOpen(!isUserSwitcherOpen)}
-                className="rounded-lg bg-white border border-neutral-200 px-2 py-1 text-[10px] font-bold text-neutral-700 shadow-2xs"
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setIsUserSwitcherOpen(true);
+                }}
+                className="rounded-lg bg-white border border-neutral-200 px-2.5 py-1 text-[10px] font-bold text-neutral-700 shadow-2xs hover:bg-neutral-50"
               >
                 Switch
               </button>
@@ -363,45 +500,74 @@ export function Navbar({
         </div>
       )}
 
-      {/* Bottom Mobile Navigation Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 flex h-14 items-center justify-around border-t border-neutral-200 bg-white/95 backdrop-blur-md lg:hidden px-2 shadow-lg">
-        <button
-          onClick={() => handleNavClick(getMainDashboardRoute())}
-          className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-colors ${
-            currentPath === getMainDashboardRoute() ? 'text-emerald-600' : 'text-neutral-500 hover:text-neutral-900'
-          }`}
-        >
-          <Home className="h-4 w-4" />
-          <span>Dashboard</span>
-        </button>
+      {/* Bottom Mobile Navigation Bar — Modern Floating Center Action */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200/90 bg-white/95 backdrop-blur-md lg:hidden shadow-2xl pb-safe">
+        <div className="relative mx-auto flex h-16 max-w-md items-center justify-between px-1 sm:px-2">
+          {/* 1. Orders */}
+          <button
+            type="button"
+            onClick={() => handleNavClick(getOrdersRoute())}
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[10px] sm:text-[11px] font-bold transition-all ${
+              isOrdersActive ? 'text-emerald-600 font-extrabold' : 'text-neutral-900 hover:text-black font-semibold'
+            }`}
+          >
+            <ShoppingBag className={`h-4.5 w-4.5 sm:h-5 sm:w-5 ${isOrdersActive ? 'text-emerald-600 stroke-[2.5]' : 'text-neutral-900'}`} />
+            <span className="truncate">{t('nav.orders', 'Orders')}</span>
+            {isOrdersActive && <span className="h-1 w-1 rounded-full bg-emerald-600 -mt-0.5" />}
+          </button>
 
-        <button
-          onClick={() => handleNavClick(getPrimaryCatalogRoute())}
-          className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-colors ${
-            currentPath === getPrimaryCatalogRoute() ? 'text-emerald-600' : 'text-neutral-500 hover:text-neutral-900'
-          }`}
-        >
-          <Grid className="h-4 w-4" />
-          <span>Catalog</span>
-        </button>
+          {/* 2. Products */}
+          <button
+            type="button"
+            onClick={() => handleNavClick(getProductsRoute())}
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[10px] sm:text-[11px] font-bold transition-all ${
+              isProductsActive ? 'text-emerald-600 font-extrabold' : 'text-neutral-900 hover:text-black font-semibold'
+            }`}
+          >
+            <Package className={`h-4.5 w-4.5 sm:h-5 sm:w-5 ${isProductsActive ? 'text-emerald-600 stroke-[2.5]' : 'text-neutral-900'}`} />
+            <span className="truncate">{t('nav.products', 'Products')}</span>
+            {isProductsActive && <span className="h-1 w-1 rounded-full bg-emerald-600 -mt-0.5" />}
+          </button>
 
-        <button
-          onClick={() => handleNavClick(getPrimaryOrdersRoute())}
-          className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-colors ${
-            currentPath === getPrimaryOrdersRoute() ? 'text-emerald-600' : 'text-neutral-500 hover:text-neutral-900'
-          }`}
-        >
-          <ShoppingBag className="h-4 w-4" />
-          <span>Orders</span>
-        </button>
+          {/* 3. Floating Center Action (+ Add Product) */}
+          <div className="flex flex-1 items-center justify-center relative -top-3">
+            <button
+              type="button"
+              onClick={handleAddProductClick}
+              className="flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-4 ring-white transition-all duration-150 hover:bg-emerald-700 active:scale-95 focus:outline-none"
+              aria-label={t('catalog.addProduct', 'Add Product')}
+              title={t('catalog.addProduct', 'Add Product')}
+            >
+              <Plus className="h-6 w-6 stroke-[2.8]" />
+            </button>
+          </div>
 
-        <button
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold text-neutral-500 hover:text-neutral-900"
-        >
-          <Menu className="h-4 w-4" />
-          <span>Menu</span>
-        </button>
+          {/* 4. Analytics */}
+          <button
+            type="button"
+            onClick={() => handleNavClick(getAnalyticsRoute())}
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[10px] sm:text-[11px] font-bold transition-all ${
+              isAnalyticsActive ? 'text-emerald-600 font-extrabold' : 'text-neutral-900 hover:text-black font-semibold'
+            }`}
+          >
+            <BarChart3 className={`h-4.5 w-4.5 sm:h-5 sm:w-5 ${isAnalyticsActive ? 'text-emerald-600 stroke-[2.5]' : 'text-neutral-900'}`} />
+            <span className="truncate">{t('nav.analytics', 'Analytics')}</span>
+            {isAnalyticsActive && <span className="h-1 w-1 rounded-full bg-emerald-600 -mt-0.5" />}
+          </button>
+
+          {/* 5. Settings */}
+          <button
+            type="button"
+            onClick={() => handleNavClick(getSettingsRoute())}
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[10px] sm:text-[11px] font-bold transition-all ${
+              isSettingsActive ? 'text-emerald-600 font-extrabold' : 'text-neutral-900 hover:text-black font-semibold'
+            }`}
+          >
+            <Settings className={`h-4.5 w-4.5 sm:h-5 sm:w-5 ${isSettingsActive ? 'text-emerald-600 stroke-[2.5]' : 'text-neutral-900'}`} />
+            <span className="truncate">{t('nav.settings', 'Settings')}</span>
+            {isSettingsActive && <span className="h-1 w-1 rounded-full bg-emerald-600 -mt-0.5" />}
+          </button>
+        </div>
       </div>
     </>
   );

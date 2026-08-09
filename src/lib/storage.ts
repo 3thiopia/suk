@@ -329,6 +329,20 @@ class MarketplaceStorageService {
     return newUser;
   }
 
+  public updateUser(userId: string, updates: Partial<User>): User | undefined {
+    const users = this.getUsers();
+    let updatedUser: User | undefined;
+    const updatedUsers = users.map((u) => {
+      if (u.id === userId) {
+        updatedUser = { ...u, ...updates };
+        return updatedUser;
+      }
+      return u;
+    });
+    this.setItem(STORAGE_KEYS.USERS, updatedUsers);
+    return updatedUser;
+  }
+
   public createBusiness(bizData: Partial<BusinessProfile> & { ownerId: string; businessName: string }): BusinessProfile {
     const businesses = this.getBusinesses();
     const newBiz: BusinessProfile = {

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { CompactFilterSection, FilterChip } from '../common/CompactFilterSection';
 import {
   Building2,
   CheckCircle2,
@@ -157,6 +158,41 @@ export function SupplierProfilePage({ businessId, onNavigate, onBack }: Supplier
     const set = new Set(allSupplierProducts.map((p) => p.category));
     return Array.from(set);
   }, [allSupplierProducts]);
+
+  const supplierActiveChips = useMemo(() => {
+    const chips: FilterChip[] = [];
+    if (selectedCategory !== 'all') {
+      chips.push({
+        id: 'category',
+        label: `Category: ${selectedCategory}`,
+        onRemove: () => setSelectedCategory('all'),
+      });
+    }
+    if (stockFilter !== 'all') {
+      chips.push({
+        id: 'stock',
+        label: stockFilter === 'in_stock' ? 'In Stock Only' : 'Out of Stock',
+        onRemove: () => setStockFilter('all'),
+      });
+    }
+    if (priceFilter !== 'all') {
+      chips.push({
+        id: 'price',
+        label: `Price: ${priceFilter.replace('_', ' ')}`,
+        onRemove: () => setPriceFilter('all'),
+      });
+    }
+    if (commissionFilter !== 'all') {
+      chips.push({
+        id: 'commission',
+        label: `${commissionFilter}%+ Comm`,
+        onRemove: () => setCommissionFilter('all'),
+      });
+    }
+    return chips;
+  }, [selectedCategory, stockFilter, priceFilter, commissionFilter]);
+
+  const activeSupplierFiltersCount = supplierActiveChips.length;
 
   // Featured Products
   const featuredProducts = useMemo(() => {
@@ -598,123 +634,102 @@ export function SupplierProfilePage({ businessId, onNavigate, onBack }: Supplier
       {activeTab === 'products' && (
         <div className="space-y-6">
           {/* SEARCH & FILTERS BAR */}
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-2xs space-y-3">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              {/* Search Bar */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-3 h-4 w-4 text-neutral-400" />
-                <input
-                  type="text"
-                  placeholder="Search products by name, tag, or brand..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-4 text-xs font-medium text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:border-neutral-900"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-3 text-neutral-400 hover:text-neutral-600"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Sorting & Filter Controls */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Category Dropdown */}
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-700 focus:bg-white focus:outline-none"
-                >
-                  <option value="all">All Categories ({supplierCategories.length})</option>
-                  {supplierCategories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Stock Filter */}
-                <select
-                  value={stockFilter}
-                  onChange={(e) => setStockFilter(e.target.value as StockFilter)}
-                  className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-700 focus:bg-white focus:outline-none"
-                >
-                  <option value="all">Stock: All</option>
-                  <option value="in_stock">In Stock Only</option>
-                  <option value="out_of_stock">Out of Stock</option>
-                </select>
-
-                {/* Price Filter */}
-                <select
-                  value={priceFilter}
-                  onChange={(e) => setPriceFilter(e.target.value as PriceFilter)}
-                  className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-700 focus:bg-white focus:outline-none"
-                >
-                  <option value="all">Price: All</option>
-                  <option value="under_50">Under $50</option>
-                  <option value="50_150">$50 - $150</option>
-                  <option value="150_300">$150 - $300</option>
-                  <option value="over_300">Over $300</option>
-                </select>
-
-                {/* Commission Filter */}
-                <select
-                  value={commissionFilter}
-                  onChange={(e) => setCommissionFilter(e.target.value as CommissionFilter)}
-                  className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-700 focus:bg-white focus:outline-none"
-                >
-                  <option value="all">Commission: All</option>
-                  <option value="10">10%+ Commission</option>
-                  <option value="15">15%+ Commission</option>
-                  <option value="20">20%+ Commission</option>
-                  <option value="25">25%+ Commission</option>
-                </select>
-
-                {/* Sort Option */}
+          <CompactFilterSection
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search products by name, tag, or brand..."
+            activeCount={activeSupplierFiltersCount}
+            activeChips={supplierActiveChips}
+            resultsCount={filteredProducts.length}
+            resultsLabel={`of ${allSupplierProducts.length} products`}
+            onResetAll={() => {
+              setSearchQuery('');
+              setSelectedCategory('all');
+              setPriceFilter('all');
+              setCommissionFilter('all');
+              setStockFilter('all');
+              setSortBy('newest');
+            }}
+            sortControl={
+              <div className="flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-900 px-3 py-1.5 text-xs font-bold text-white w-full sm:w-auto">
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="rounded-xl border border-neutral-200 bg-neutral-900 px-3 py-2 text-xs font-bold text-white focus:outline-none"
+                  className="bg-transparent font-bold text-white focus:outline-none text-xs w-full cursor-pointer"
                 >
-                  <option value="newest">Sort: Newest First</option>
-                  <option value="highest_commission">Sort: Highest Commission</option>
-                  <option value="lowest_price">Sort: Price (Low to High)</option>
-                  <option value="highest_price">Sort: Price (High to Low)</option>
-                  <option value="popular">Sort: Most Stocked</option>
-                  <option value="oldest">Sort: Oldest First</option>
+                  <option value="newest" className="text-neutral-900 bg-white">Sort: Newest First</option>
+                  <option value="highest_commission" className="text-neutral-900 bg-white">Sort: Highest Commission</option>
+                  <option value="lowest_price" className="text-neutral-900 bg-white">Sort: Price (Low to High)</option>
+                  <option value="highest_price" className="text-neutral-900 bg-white">Sort: Price (High to Low)</option>
+                  <option value="popular" className="text-neutral-900 bg-white">Sort: Most Stocked</option>
+                  <option value="oldest" className="text-neutral-900 bg-white">Sort: Oldest First</option>
                 </select>
               </div>
+            }
+          >
+            {/* Category Filter */}
+            <div className="space-y-1 w-full sm:w-auto">
+              <label className="block text-[11px] font-bold text-neutral-400 uppercase sm:hidden">Category</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full sm:w-auto rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-800 focus:bg-white focus:outline-none focus:border-neutral-900 cursor-pointer"
+              >
+                <option value="all">All Categories ({supplierCategories.length})</option>
+                {supplierCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* Results count & active filters reset */}
-            <div className="flex items-center justify-between text-xs text-neutral-500 pt-1 border-t border-neutral-100">
-              <span>
-                Showing <strong className="text-neutral-900">{filteredProducts.length}</strong> of{' '}
-                {allSupplierProducts.length} products
-              </span>
-              {(searchQuery ||
-                selectedCategory !== 'all' ||
-                priceFilter !== 'all' ||
-                commissionFilter !== 'all' ||
-                stockFilter !== 'all') && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedCategory('all');
-                    setPriceFilter('all');
-                    setCommissionFilter('all');
-                    setStockFilter('all');
-                  }}
-                  className="font-bold text-emerald-600 hover:underline"
-                >
-                  Reset Filters
-                </button>
-              )}
+            {/* Stock Filter */}
+            <div className="space-y-1 w-full sm:w-auto">
+              <label className="block text-[11px] font-bold text-neutral-400 uppercase sm:hidden">Stock Level</label>
+              <select
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value as StockFilter)}
+                className="w-full sm:w-auto rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-800 focus:bg-white focus:outline-none focus:border-neutral-900 cursor-pointer"
+              >
+                <option value="all">Stock: All</option>
+                <option value="in_stock">In Stock Only</option>
+                <option value="out_of_stock">Out of Stock</option>
+              </select>
             </div>
-          </div>
+
+            {/* Price Filter */}
+            <div className="space-y-1 w-full sm:w-auto">
+              <label className="block text-[11px] font-bold text-neutral-400 uppercase sm:hidden">Price Range</label>
+              <select
+                value={priceFilter}
+                onChange={(e) => setPriceFilter(e.target.value as PriceFilter)}
+                className="w-full sm:w-auto rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-800 focus:bg-white focus:outline-none focus:border-neutral-900 cursor-pointer"
+              >
+                <option value="all">Price: All</option>
+                <option value="under_50">Under $50</option>
+                <option value="50_150">$50 - $150</option>
+                <option value="150_300">$150 - $300</option>
+                <option value="over_300">Over $300</option>
+              </select>
+            </div>
+
+            {/* Commission Filter */}
+            <div className="space-y-1 w-full sm:w-auto">
+              <label className="block text-[11px] font-bold text-neutral-400 uppercase sm:hidden">Commission</label>
+              <select
+                value={commissionFilter}
+                onChange={(e) => setCommissionFilter(e.target.value as CommissionFilter)}
+                className="w-full sm:w-auto rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-800 focus:bg-white focus:outline-none focus:border-neutral-900 cursor-pointer"
+              >
+                <option value="all">Commission: All</option>
+                <option value="10">10%+ Commission</option>
+                <option value="15">15%+ Commission</option>
+                <option value="20">20%+ Commission</option>
+                <option value="25">25%+ Commission</option>
+              </select>
+            </div>
+          </CompactFilterSection>
 
           {/* PRODUCTS GRID */}
           {filteredProducts.length === 0 ? (

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { CompactFilterSection, FilterChip } from '../common/CompactFilterSection';
 import {
   Plus,
   Search,
@@ -107,6 +108,15 @@ export function ProductManager() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // Listen for global open-add-product-modal event (from mobile navbar floating action)
+  useEffect(() => {
+    const handleOpenAddEvent = () => {
+      handleOpenCreateModal();
+    };
+    window.addEventListener('open-add-product-modal', handleOpenAddEvent);
+    return () => window.removeEventListener('open-add-product-modal', handleOpenAddEvent);
+  }, [business]);
+
   // Form State
   const [formData, setFormData] = useState({
     title: '',
@@ -182,6 +192,35 @@ export function ProductManager() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedCategory, selectedStatus, stockFilter, sortBy, itemsPerPage]);
+
+  // Active Filter Chips & Count
+  const productActiveChips = useMemo(() => {
+    const chips: FilterChip[] = [];
+    if (selectedCategory !== 'all') {
+      chips.push({
+        id: 'category',
+        label: `Category: ${selectedCategory}`,
+        onRemove: () => setSelectedCategory('all'),
+      });
+    }
+    if (selectedStatus !== 'all') {
+      chips.push({
+        id: 'status',
+        label: `Status: ${selectedStatus.replace(/_/g, ' ')}`,
+        onRemove: () => setSelectedStatus('all'),
+      });
+    }
+    if (stockFilter !== 'all') {
+      chips.push({
+        id: 'stock',
+        label: `Stock: ${stockFilter.replace(/_/g, ' ')}`,
+        onRemove: () => setStockFilter('all'),
+      });
+    }
+    return chips;
+  }, [selectedCategory, selectedStatus, stockFilter]);
+
+  const activeFiltersCount = productActiveChips.length;
 
   // Paginated View
   const totalPages = Math.max(1, Math.ceil(filteredAndSortedProducts.length / itemsPerPage));
@@ -347,14 +386,14 @@ export function ProductManager() {
     <div className="space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-2xl bg-neutral-900 px-4 py-3 text-xs font-bold text-white shadow-2xl animate-fade-in border border-neutral-700">
+        <div className="fixed bottom-24 sm:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-2 rounded-2xl bg-neutral-900 px-4 py-3 text-xs font-bold text-white shadow-2xl animate-fade-in border border-neutral-700">
           <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Top Header & View Switcher */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* Top Header & Primary Action */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-neutral-900">{t('catalog.title', 'Brand Product Catalog')}</h1>
           <p className="text-xs text-neutral-500">
@@ -362,150 +401,131 @@ export function ProductManager() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* View Toggle Switcher */}
-          <div className="flex items-center rounded-xl border border-neutral-200 bg-neutral-100 p-1 shadow-2xs">
-            <button
-              onClick={() => handleSetViewMode('card')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                viewMode === 'card'
-                  ? 'bg-white text-neutral-900 shadow-2xs border border-neutral-200'
-                  : 'text-neutral-500 hover:text-neutral-900'
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              <span>{t('catalog.cardView', 'Card View')}</span>
-            </button>
-            <button
-              onClick={() => handleSetViewMode('table')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                viewMode === 'table'
-                  ? 'bg-white text-neutral-900 shadow-2xs border border-neutral-200'
-                  : 'text-neutral-500 hover:text-neutral-900'
-              }`}
-            >
-              <TableIcon className="h-3.5 w-3.5" />
-              <span>{t('catalog.tableView', 'Table View')}</span>
-            </button>
-          </div>
-
-          <button
-            onClick={handleOpenCreateModal}
-            className="inline-flex items-center gap-2 rounded-xl bg-neutral-900 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-neutral-800 shrink-0"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{t('catalog.addProduct', 'Add Product')}</span>
-          </button>
-        </div>
+        {/* Desktop / Tablet Primary Action Button - Prominent & Standalone */}
+        <button
+          type="button"
+          onClick={handleOpenCreateModal}
+          className="hidden sm:inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-neutral-800 active:scale-98 shrink-0"
+        >
+          <Plus className="h-4 w-4" />
+          <span>{t('catalog.addProduct', 'Add Product')}</span>
+        </button>
       </div>
 
       {/* Filter, Search & Sorting Bar */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-3.5 shadow-2xs">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
-            <input
-              type="text"
-              placeholder={t('catalog.searchProducts', 'Search products by title, brand, tag, or category...')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2 pl-9 pr-8 text-xs text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:border-neutral-900"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-600"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter Dropdowns Group */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Category Filter */}
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-700 focus:bg-white focus:outline-none"
-            >
-              <option value="all">{t('catalog.allCategories', 'All Categories')} ({categories.length})</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-
-            {/* Status Filter */}
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-700 focus:bg-white focus:outline-none"
-            >
-              <option value="all">{t('catalog.allStatuses', 'All Statuses')}</option>
-              <option value="active">{t('common.active', 'Active')}</option>
-              <option value="out_of_stock">{t('catalog.outOfStock', 'Out of Stock')}</option>
-              <option value="archived">{t('catalog.archived', 'Archived')}</option>
-              <option value="hidden">{t('catalog.hiddenByAdmin', 'Hidden by Admin')} ({hiddenProductsCount})</option>
-            </select>
-
-            {/* Stock Level Filter */}
-            <select
-              value={stockFilter}
-              onChange={(e) => setStockFilter(e.target.value as any)}
-              className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-700 focus:bg-white focus:outline-none"
-            >
-              <option value="all">All Stock Levels</option>
-              <option value="in_stock">In Stock (&gt; 5)</option>
-              <option value="low_stock">Low Stock (1 - 5)</option>
-              <option value="out_of_stock">Out of Stock (0)</option>
-            </select>
-
-            {/* Sorting */}
-            <div className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-700">
-              <ArrowUpDown className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-transparent py-1 font-medium text-neutral-700 focus:outline-none text-xs"
-              >
-                <option value="newest">Sort: Last Updated</option>
-                <option value="title_asc">Title: A to Z</option>
-                <option value="title_desc">Title: Z to A</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-                <option value="stock_asc">Stock: Low to High</option>
-                <option value="stock_desc">Stock: High to Low</option>
-                <option value="commission">Highest Reseller Earnings</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Filter Summary & Clear Button */}
-        {(searchQuery || selectedCategory !== 'all' || selectedStatus !== 'all' || stockFilter !== 'all') && (
-          <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-500">
-            <span>
-              Found <strong>{filteredAndSortedProducts.length}</strong> product{filteredAndSortedProducts.length === 1 ? '' : 's'} matching active filters
-            </span>
+      <CompactFilterSection
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder={t('catalog.searchProducts', 'Search products by title, brand, tag...')}
+        activeCount={activeFiltersCount}
+        activeChips={productActiveChips}
+        resultsCount={filteredAndSortedProducts.length}
+        resultsLabel="products"
+        onResetAll={() => {
+          setSearchQuery('');
+          setSelectedCategory('all');
+          setSelectedStatus('all');
+          setStockFilter('all');
+          setSortBy('newest');
+        }}
+        rightControls={
+          <div className="inline-flex items-center rounded-xl border border-neutral-200 bg-neutral-100 p-1 shadow-2xs shrink-0">
             <button
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedCategory('all');
-                setSelectedStatus('all');
-                setStockFilter('all');
-                setSortBy('newest');
-              }}
-              className="font-bold text-neutral-700 hover:text-neutral-900 flex items-center gap-1 hover:underline"
+              type="button"
+              onClick={() => handleSetViewMode('card')}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
+                viewMode === 'card'
+                  ? 'bg-white text-neutral-900 shadow-2xs border border-neutral-200/80'
+                  : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+              title={t('catalog.cardView', 'Card View')}
             >
-              <RotateCcw className="h-3 w-3" />
-              Reset All Filters
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span>Cards</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetViewMode('table')}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
+                viewMode === 'table'
+                  ? 'bg-white text-neutral-900 shadow-2xs border border-neutral-200/80'
+                  : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+              title={t('catalog.tableView', 'Table View')}
+            >
+              <TableIcon className="h-3.5 w-3.5" />
+              <span>Table</span>
             </button>
           </div>
-        )}
-      </div>
+        }
+        sortControl={
+          <div className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-xs font-semibold text-neutral-800 w-full sm:w-auto">
+            <ArrowUpDown className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-transparent font-semibold text-neutral-800 focus:outline-none text-xs w-full cursor-pointer"
+            >
+              <option value="newest">Sort: Last Updated</option>
+              <option value="title_asc">Title: A to Z</option>
+              <option value="title_desc">Title: Z to A</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="stock_asc">Stock: Low to High</option>
+              <option value="stock_desc">Stock: High to Low</option>
+              <option value="commission">Highest Earnings</option>
+            </select>
+          </div>
+        }
+      >
+        {/* Category Filter */}
+        <div className="space-y-1 w-full sm:w-auto">
+          <label className="block text-[11px] font-bold text-neutral-400 uppercase sm:hidden">Category</label>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="w-full sm:w-auto rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-800 focus:bg-white focus:outline-none focus:border-neutral-900 cursor-pointer"
+          >
+            <option value="all">{t('catalog.allCategories', 'All Categories')} ({categories.length})</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Status Filter */}
+        <div className="space-y-1 w-full sm:w-auto">
+          <label className="block text-[11px] font-bold text-neutral-400 uppercase sm:hidden">Status</label>
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="w-full sm:w-auto rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-800 focus:bg-white focus:outline-none focus:border-neutral-900 cursor-pointer"
+          >
+            <option value="all">{t('catalog.allStatuses', 'All Statuses')}</option>
+            <option value="active">{t('common.active', 'Active')}</option>
+            <option value="out_of_stock">{t('catalog.outOfStock', 'Out of Stock')}</option>
+            <option value="archived">{t('catalog.archived', 'Archived')}</option>
+            <option value="hidden">{t('catalog.hiddenByAdmin', 'Hidden by Admin')} ({hiddenProductsCount})</option>
+          </select>
+        </div>
+
+        {/* Stock Level Filter */}
+        <div className="space-y-1 w-full sm:w-auto">
+          <label className="block text-[11px] font-bold text-neutral-400 uppercase sm:hidden">Stock Level</label>
+          <select
+            value={stockFilter}
+            onChange={(e) => setStockFilter(e.target.value as any)}
+            className="w-full sm:w-auto rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-800 focus:bg-white focus:outline-none focus:border-neutral-900 cursor-pointer"
+          >
+            <option value="all">All Stock Levels</option>
+            <option value="in_stock">In Stock (&gt; 5)</option>
+            <option value="low_stock">Low Stock (1 - 5)</option>
+            <option value="out_of_stock">Out of Stock (0)</option>
+          </select>
+        </div>
+      </CompactFilterSection>
 
       {/* Hidden Moderated Products Alert Banner */}
       {hiddenProductsCount > 0 && (

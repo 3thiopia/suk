@@ -124,7 +124,7 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
   }
 
   return (
-    <div className={`relative inline-block text-left shrink-0 ${className}`}>
+    <div className={`relative text-left shrink-0 ${className}`}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}

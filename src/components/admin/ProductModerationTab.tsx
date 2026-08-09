@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CompactFilterSection, FilterChip } from '../common/CompactFilterSection';
 import {
   Package,
   Search,
@@ -185,22 +186,41 @@ export function ProductModerationTab({
               <XCircle className="h-4 w-4 shrink-0 text-emerald-600" />
             </button>
           )}
+        </div>
+      </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
-            <input
-              type="text"
-              placeholder="Search title, brand, ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-9 w-60 rounded-xl border border-neutral-200 bg-neutral-50 pl-9 pr-4 text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-neutral-900"
-            />
-          </div>
-
+      <CompactFilterSection
+        searchQuery={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Search title, brand, ID..."
+        activeCount={(selectedBusiness !== 'all' ? 1 : 0) + (selectedCategory !== 'all' ? 1 : 0)}
+        activeChips={[
+          ...(selectedBusiness !== 'all' ? [{
+            id: 'business',
+            label: `Brand: ${businesses.find((b) => b.id === selectedBusiness)?.businessName || selectedBusiness}`,
+            onRemove: () => setSelectedBusiness('all'),
+          }] : []),
+          ...(selectedCategory !== 'all' ? [{
+            id: 'category',
+            label: `Category: ${selectedCategory}`,
+            onRemove: () => setSelectedCategory('all'),
+          }] : []),
+        ]}
+        resultsCount={filtered.length}
+        resultsLabel="products"
+        onResetAll={() => {
+          setSearchTerm('');
+          setSelectedBusiness('all');
+          setSelectedCategory('all');
+        }}
+      >
+        {/* Business Brand Filter */}
+        <div className="space-y-1 w-full sm:w-auto">
+          <label className="block text-[11px] font-bold text-neutral-400 uppercase sm:hidden">Brand/Business</label>
           <select
             value={selectedBusiness}
             onChange={(e) => setSelectedBusiness(e.target.value)}
-            className="h-9 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700"
+            className="w-full sm:w-auto rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-800 focus:bg-white focus:outline-none focus:border-neutral-900 cursor-pointer"
           >
             <option value="all">All Brands</option>
             {businesses.map((b) => (
@@ -209,11 +229,15 @@ export function ProductModerationTab({
               </option>
             ))}
           </select>
+        </div>
 
+        {/* Category Filter */}
+        <div className="space-y-1 w-full sm:w-auto">
+          <label className="block text-[11px] font-bold text-neutral-400 uppercase sm:hidden">Category</label>
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="h-9 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700"
+            className="w-full sm:w-auto rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-800 focus:bg-white focus:outline-none focus:border-neutral-900 cursor-pointer"
           >
             <option value="all">All Categories</option>
             {categories.map((cat) => (
@@ -223,7 +247,7 @@ export function ProductModerationTab({
             ))}
           </select>
         </div>
-      </div>
+      </CompactFilterSection>
 
       {/* Product Grid Table */}
       <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xs">
