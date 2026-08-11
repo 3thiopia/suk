@@ -784,12 +784,7 @@ export function SupplierProfilePage({ businessId, onNavigate, onBack }: Supplier
                         </span>
                       </div>
 
-                      {/* View Details Button on Hover */}
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-1.5 text-xs font-bold text-neutral-900 shadow-md backdrop-blur-xs">
-                          <Eye className="h-3.5 w-3.5 text-emerald-600" /> View Details
-                        </span>
-                      </div>
+
                     </div>
 
                     {/* Details Content */}

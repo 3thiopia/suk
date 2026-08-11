@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Camera, Trash2, ArrowLeft, ArrowRight, Star, AlertCircle, Image as ImageIcon, Sparkles, Plus, Check } from 'lucide-react';
+import { Upload, Camera, Trash2, ArrowLeft, ArrowRight, Star, AlertCircle, Image as ImageIcon, Sparkles, Plus, Check, MoreVertical, X } from 'lucide-react';
 import { processImageFile, formatBytes } from '../../lib/imageUtils';
 
 interface MultiImageUploaderProps {
@@ -18,8 +18,8 @@ export function MultiImageUploader({
   value = [],
   onChange,
   label = 'Product Image Gallery',
-  description = 'Upload product photos. Choose the primary image that will be shown on product cards.',
-  maxImages = 10,
+  description = 'Upload product photos. The first image will be set as the primary cover.',
+  maxImages = 5,
   maxSizeBytes = 10 * 1024 * 1024,
   allowPrimarySelection = true,
   allowCamera = true,
@@ -32,24 +32,57 @@ export function MultiImageUploader({
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activeMenuIndex, setActiveMenuIndex] = useState<number | null>(null);
 
   const handleFiles = async (filesList: FileList | File[]) => {
     if (!filesList || filesList.length === 0) return;
     setErrorMsg(null);
 
     const filesArray = Array.from(filesList);
-    const availableSlots = maxImages - value.length;
+    const currentCount = value.length;
+    const availableSlots = maxImages - currentCount;
 
     if (availableSlots <= 0) {
-      setErrorMsg(`Maximum gallery limit reached (${maxImages} images). Remove an existing image to upload more.`);
+      setErrorMsg(`Maximum limit reached (${maxImages} images total). Remove an existing image to add more.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
       return;
     }
 
-    const filesToProcess = filesArray.slice(0, availableSlots);
+    let warningMsg: string | null = null;
+    if (filesArray.length > availableSlots) {
+      warningMsg = `You can add only ${availableSlots} more image${availableSlots === 1 ? '' : 's'}. A product can have a maximum of ${maxImages} images.`;
+    }
+
+    // Filter valid image types
+    const validFiles: File[] = [];
+    let invalidType = false;
+    let tooLarge = false;
+
+    for (const f of filesArray) {
+      if (!f.type.startsWith('image/')) {
+        invalidType = true;
+        continue;
+      }
+      if (f.size > maxSizeBytes) {
+        tooLarge = true;
+        continue;
+      }
+      validFiles.push(f);
+    }
+
+    if (validFiles.length === 0) {
+      if (invalidType) setErrorMsg('Invalid file format. Please upload JPG, PNG, WEBP, or SVG images.');
+      else if (tooLarge) setErrorMsg(`Image size exceeds the ${formatBytes(maxSizeBytes)} limit.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      return;
+    }
+
+    const filesToProcess = validFiles.slice(0, availableSlots);
     setIsProcessing(true);
 
     const newImages: string[] = [];
-    let successCount = 0;
     let failError: string | null = null;
 
     for (let i = 0; i < filesToProcess.length; i++) {
@@ -59,7 +92,6 @@ export function MultiImageUploader({
       try {
         const processed = await processImageFile(file, { maxSizeBytes });
         newImages.push(processed.dataUrl);
-        successCount++;
       } catch (err: any) {
         failError = err.message || `Failed to process ${file.name}`;
       }
@@ -68,11 +100,16 @@ export function MultiImageUploader({
     setIsProcessing(false);
     setUploadStatus('');
 
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+
     if (newImages.length > 0) {
       onChange([...value, ...newImages]);
     }
 
-    if (failError) {
+    if (warningMsg) {
+      setErrorMsg(warningMsg);
+    } else if (failError) {
       setErrorMsg(failError);
     }
   };
@@ -102,6 +139,7 @@ export function MultiImageUploader({
   const handleRemoveImage = (index: number) => {
     const updated = value.filter((_, i) => i !== index);
     onChange(updated);
+    setActiveMenuIndex(null);
   };
 
   const handleSetPrimary = (index: number) => {
@@ -109,6 +147,7 @@ export function MultiImageUploader({
     const selected = value[index];
     const remaining = value.filter((_, i) => i !== index);
     onChange([selected, ...remaining]);
+    setActiveMenuIndex(null);
   };
 
   const handleMoveLeft = (index: number) => {
@@ -158,9 +197,9 @@ export function MultiImageUploader({
       {/* Label & Description */}
       {label && (
         <div className="flex items-center justify-between">
-          <label className="block text-xs font-bold text-neutral-800">{label}</label>
-          <span className="text-[10px] text-neutral-400 font-medium">
-            {value.length} / {maxImages} images uploaded
+          <label className="block text-xs sm:text-sm font-bold text-neutral-800">{label}</label>
+          <span className="text-[10px] sm:text-xs text-neutral-500 font-semibold bg-neutral-100 px-2 py-0.5 rounded-full">
+            {value.length} / {maxImages} uploaded
           </span>
         </div>
       )}
@@ -186,81 +225,147 @@ export function MultiImageUploader({
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
           {value.map((imgUrl, idx) => {
             const isPrimary = idx === 0;
+            const isMenuOpen = activeMenuIndex === idx;
 
             return (
               <div
                 key={idx}
-                className={`group relative overflow-hidden rounded-2xl border bg-white transition-all shadow-2xs ${
-                  isPrimary ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-neutral-200 hover:border-neutral-300'
+                className={`group relative overflow-hidden rounded-2xl border bg-white transition-all shadow-xs ${
+                  isPrimary ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-neutral-200'
                 }`}
               >
                 <div className="relative aspect-square w-full bg-neutral-100 overflow-hidden">
                   <img
                     src={imgUrl}
                     alt={`Upload ${idx + 1}`}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    className="h-full w-full object-cover"
                   />
 
-                  {/* Primary Badge */}
-                  {allowPrimarySelection && isPrimary && (
-                    <div className="absolute top-2 left-2 flex items-center gap-1 rounded-lg bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-md">
-                      <Star className="h-3 w-3 fill-current" /> Primary Cover
+                  {/* Always visible Primary Badge */}
+                  {allowPrimarySelection && isPrimary ? (
+                    <div className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-extrabold text-white shadow-md border border-emerald-400/30">
+                      <Star className="h-3 w-3 fill-current" /> ★ PRIMARY
+                    </div>
+                  ) : (
+                    <div className="absolute top-2 left-2 z-10 rounded-lg bg-neutral-900/60 backdrop-blur-xs px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                      #{idx + 1}
                     </div>
                   )}
 
-                  {/* Overlay Controls */}
-                  <div className="absolute inset-0 bg-neutral-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-between p-2">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveImage(idx)}
-                        className="rounded-lg bg-rose-600 p-1.5 text-white shadow-md hover:bg-rose-700 transition-colors"
-                        title="Delete Image"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                  {/* Touch-Friendly Action Menu Button (⋮) - Always visible on mobile & desktop */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveMenuIndex(isMenuOpen ? null : idx);
+                    }}
+                    aria-label="Image actions"
+                    className="absolute top-2 right-2 z-20 flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-900/80 backdrop-blur-xs text-white shadow-md hover:bg-neutral-900 active:scale-95 transition-all"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
 
-                    <div className="flex items-center justify-between gap-1">
-                      <div className="flex items-center gap-1">
-                        {idx > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => handleMoveLeft(idx)}
-                            className="rounded-lg bg-white/90 p-1 text-neutral-800 shadow-sm hover:bg-white"
-                            title="Move Left"
-                          >
-                            <ArrowLeft className="h-3 w-3" />
-                          </button>
-                        )}
-                        {idx < value.length - 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleMoveRight(idx)}
-                            className="rounded-lg bg-white/90 p-1 text-neutral-800 shadow-sm hover:bg-white"
-                            title="Move Right"
-                          >
-                            <ArrowRight className="h-3 w-3" />
-                          </button>
-                        )}
-                      </div>
-
-                      {allowPrimarySelection && !isPrimary && (
+                  {/* Touch Action Popover Menu */}
+                  {isMenuOpen && (
+                    <div
+                      className="absolute inset-0 bg-neutral-950/85 backdrop-blur-xs z-30 p-2.5 flex flex-col justify-between rounded-2xl animate-fadeIn text-white"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between border-b border-white/20 pb-1.5">
+                        <span className="text-[11px] font-bold text-white">Photo #{idx + 1} Options</span>
                         <button
                           type="button"
-                          onClick={() => handleSetPrimary(idx)}
-                          className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm hover:bg-emerald-700"
+                          onClick={() => setActiveMenuIndex(null)}
+                          className="p-1 text-white/70 hover:text-white rounded-lg hover:bg-white/10"
                         >
-                          <Star className="h-2.5 w-2.5" /> Make Primary
+                          <X className="h-4 w-4" />
                         </button>
-                      )}
+                      </div>
+
+                      <div className="space-y-1.5 my-auto">
+                        {!isPrimary && allowPrimarySelection && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetPrimary(idx)}
+                            className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2 px-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-95 transition-all"
+                          >
+                            <Star className="h-3.5 w-3.5 fill-current" />
+                            <span>Make Primary</span>
+                          </button>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            disabled={idx === 0}
+                            onClick={() => handleMoveLeft(idx)}
+                            className={`flex items-center justify-center gap-1 rounded-xl py-1.5 text-xs font-bold ${
+                              idx === 0
+                                ? 'bg-white/10 text-white/30 cursor-not-allowed'
+                                : 'bg-white/20 text-white hover:bg-white/30 active:scale-95'
+                            }`}
+                          >
+                            <ArrowLeft className="h-3.5 w-3.5" /> Move Left
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={idx === value.length - 1}
+                            onClick={() => handleMoveRight(idx)}
+                            className={`flex items-center justify-center gap-1 rounded-xl py-1.5 text-xs font-bold ${
+                              idx === value.length - 1
+                                ? 'bg-white/10 text-white/30 cursor-not-allowed'
+                                : 'bg-white/20 text-white hover:bg-white/30 active:scale-95'
+                            }`}
+                          >
+                            Move Right <ArrowRight className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(idx)}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-rose-600/90 hover:bg-rose-600 py-2 px-2 text-xs font-bold text-white shadow-xs active:scale-95 transition-all"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Delete Image</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                <div className="p-2 text-[10px] font-semibold text-neutral-500 flex items-center justify-between bg-neutral-50 border-t border-neutral-100">
-                  <span>Photo #{idx + 1}</span>
-                  {isPrimary && <span className="text-emerald-700 font-extrabold uppercase">Main</span>}
+                {/* Footer bar with quick action buttons visible on touch/hover */}
+                <div className="p-2 text-[10px] font-semibold text-neutral-600 flex items-center justify-between bg-neutral-50 border-t border-neutral-100">
+                  <span className="truncate">
+                    {isPrimary ? (
+                      <span className="text-emerald-700 font-extrabold uppercase flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-current" /> Main Cover
+                      </span>
+                    ) : (
+                      `Photo #${idx + 1}`
+                    )}
+                  </span>
+
+                  <div className="flex items-center gap-1">
+                    {!isPrimary && allowPrimarySelection && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetPrimary(idx)}
+                        className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded-md transition-colors"
+                      >
+                        Set Primary
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(idx)}
+                      className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-md transition-colors"
+                      title="Delete photo"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -278,7 +383,7 @@ export function MultiImageUploader({
           className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-4 text-center transition-all ${
             isDragging
               ? 'border-emerald-500 bg-emerald-50/50 scale-[1.01]'
-              : 'border-neutral-200 bg-neutral-50/80 hover:border-neutral-400 hover:bg-neutral-100'
+              : 'border-neutral-300 bg-neutral-50/80 hover:border-neutral-400 hover:bg-neutral-100/80 active:bg-neutral-100'
           }`}
         >
           {isProcessing ? (
@@ -288,30 +393,30 @@ export function MultiImageUploader({
             </div>
           ) : (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-1">
-              <div className="flex items-center gap-3 text-left">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white border border-neutral-200 text-emerald-600 shadow-2xs">
+              <div className="flex items-center gap-3 text-left w-full sm:w-auto">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white border border-neutral-200 text-emerald-600 shadow-2xs">
                   <Upload className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-neutral-900">
-                    {value.length === 0 ? 'Upload Product Photos from Device' : 'Add More Photos'}
+                  <p className="text-xs sm:text-sm font-bold text-neutral-900">
+                    {value.length === 0 ? '+ Add Product Images' : '+ Add More Images'}
                   </p>
                   <p className="text-[11px] text-neutral-500">
-                    Drag & drop multiple files, select from gallery, or capture photo
+                    Select photos from your phone gallery or take new photo
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-stretch sm:justify-end">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     fileInputRef.current?.click();
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-neutral-900 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-neutral-800 transition-all"
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-neutral-900 min-h-[42px] px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-neutral-800 active:scale-95 transition-all"
                 >
-                  <Plus className="h-3.5 w-3.5 text-emerald-400" />
+                  <Plus className="h-4 w-4 text-emerald-400" />
                   <span>Browse Photos</span>
                 </button>
 
@@ -322,10 +427,10 @@ export function MultiImageUploader({
                       e.stopPropagation();
                       cameraInputRef.current?.click();
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3.5 py-2 text-xs font-bold text-neutral-700 shadow-2xs hover:bg-neutral-50 transition-all"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl border border-neutral-300 bg-white min-h-[42px] px-4 py-2.5 text-xs font-bold text-neutral-800 shadow-2xs hover:bg-neutral-50 active:scale-95 transition-all"
                   >
-                    <Camera className="h-3.5 w-3.5 text-neutral-500" />
-                    <span>Take Photo</span>
+                    <Camera className="h-4 w-4 text-neutral-600" />
+                    <span>Camera</span>
                   </button>
                 )}
               </div>
@@ -336,3 +441,4 @@ export function MultiImageUploader({
     </div>
   );
 }
+

@@ -684,17 +684,7 @@ export function BusinessMarketplace({ onNavigate }: BusinessMarketplaceProps) {
                                 </span>
                               </div>
 
-                              {/* Inspect Eye Button */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onNavigate(`/product/${product.id}`);
-                                }}
-                                className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/90 text-neutral-800 shadow-md backdrop-blur-md hover:bg-neutral-900 hover:text-white transition-colors"
-                                title="View Product Details"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </button>
+
                             </div>
 
                             {/* Body details */}

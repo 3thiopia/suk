@@ -597,12 +597,30 @@ export interface Follower {
   createdAt: string;
 }
 
+export interface Subcategory {
+  id: string;
+  categoryId: string;
+  name: string;
+  slug: string;
+  sortOrder?: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Category {
   id: string;
   name: string;
   slug: string;
+  description?: string;
+  icon?: string;
+  sortOrder?: number;
+  isActive?: boolean;
   parentId?: string | null;
   children?: Category[];
+  subcategories?: Subcategory[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CartItem {

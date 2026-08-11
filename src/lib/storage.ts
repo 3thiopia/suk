@@ -46,6 +46,7 @@ import {
   ReviewSortOption,
 } from '../types';
 import { generateInitialSocialLinks } from './socialPlatforms';
+import { INITIAL_PLATFORM_CATEGORIES, normalizeCategoryName, CategoryWithSubcategories } from '../data/categoriesData';
 import {
   initialUsers,
   initialBusinesses,
@@ -388,8 +389,16 @@ class MarketplaceStorageService {
   }
 
   // --- CATEGORIES ---
+  public getCategoriesWithSubcategories(): CategoryWithSubcategories[] {
+    const data = this.getItem<CategoryWithSubcategories[]>(STORAGE_KEYS.CATEGORIES, INITIAL_PLATFORM_CATEGORIES);
+    if (!data || data.length === 0 || !data[0].subcategories) {
+      return INITIAL_PLATFORM_CATEGORIES;
+    }
+    return data;
+  }
+
   public getCategories(): Category[] {
-    return this.getItem<Category[]>(STORAGE_KEYS.CATEGORIES, initialCategories);
+    return this.getCategoriesWithSubcategories();
   }
 
   // --- BUSINESS PROFILES ---
@@ -433,7 +442,14 @@ class MarketplaceStorageService {
 
   // --- PRODUCTS (BUSINESS OWNER EXCLUSIVE EDITING) ---
   public getProducts(): Product[] {
-    return this.getItem<Product[]>(STORAGE_KEYS.PRODUCTS, initialProducts);
+    const raw = this.getItem<Product[]>(STORAGE_KEYS.PRODUCTS, initialProducts);
+    return raw.map((p) => {
+      const normCat = normalizeCategoryName(p.category);
+      if (normCat !== p.category) {
+        return { ...p, category: normCat };
+      }
+      return p;
+    });
   }
 
   public getProductById(id: string): Product | undefined {
@@ -1210,28 +1226,104 @@ class MarketplaceStorageService {
     this.setItem(STORAGE_KEYS.NOTIFICATIONS, updated);
   }
 
-  // --- CATEGORIES ---
-  public addCategory(data: Omit<Category, 'id'>): Category {
-    const categories = this.getCategories();
-    const newCat: Category = {
-      ...data,
-      id: generateId('cat'),
+  // --- CATEGORIES & SUBCATEGORIES ---
+  public addCategory(data: Partial<CategoryWithSubcategories> & { name: string }): CategoryWithSubcategories {
+    const categories = this.getCategoriesWithSubcategories();
+    const catId = generateId('cat');
+    const newCat: CategoryWithSubcategories = {
+      id: catId,
+      name: data.name.trim(),
+      slug: data.slug || data.name.trim().toLowerCase().replace(/\s+/g, '-'),
+      description: data.description || '',
+      icon: data.icon || 'FolderTree',
+      sortOrder: data.sortOrder || categories.length + 1,
+      isActive: data.isActive !== false,
+      subcategories: data.subcategories || [
+        {
+          id: generateId('sub'),
+          categoryId: catId,
+          name: 'General',
+          slug: 'general',
+          isActive: true,
+          sortOrder: 1,
+        },
+      ],
     };
     this.setItem(STORAGE_KEYS.CATEGORIES, [...categories, newCat]);
-    this.logAdminAction('ADD_CATEGORY', 'category', newCat.id, `Created category branch "${newCat.name}"`);
+    this.logAdminAction('ADD_CATEGORY', 'category', newCat.id, `Created category "${newCat.name}"`);
     return newCat;
   }
 
-  public updateCategory(id: string, updates: Partial<Category>) {
-    const categories = this.getCategories();
+  public updateCategory(id: string, updates: Partial<CategoryWithSubcategories>) {
+    const categories = this.getCategoriesWithSubcategories();
     const updated = categories.map((c) => (c.id === id ? { ...c, ...updates } : c));
     this.setItem(STORAGE_KEYS.CATEGORIES, updated);
   }
 
+  public toggleCategoryActive(id: string) {
+    const categories = this.getCategoriesWithSubcategories();
+    const updated = categories.map((c) => (c.id === id ? { ...c, isActive: !c.isActive } : c));
+    this.setItem(STORAGE_KEYS.CATEGORIES, updated);
+  }
+
   public deleteCategory(id: string) {
-    const categories = this.getCategories().filter((c) => c.id !== id && c.parentId !== id);
-    this.setItem(STORAGE_KEYS.CATEGORIES, categories);
-    this.logAdminAction('DELETE_CATEGORY', 'category', id, `Removed category #${id}`);
+    // Soft disable / archive instead of destructive deletion if products exist
+    const products = this.getProducts();
+    const catObj = this.getCategoriesWithSubcategories().find((c) => c.id === id);
+    const hasProducts = catObj && products.some((p) => p.category === catObj.name);
+
+    if (hasProducts) {
+      this.toggleCategoryActive(id);
+      this.logAdminAction('ARCHIVE_CATEGORY', 'category', id, `Deactivated category "${catObj?.name}" (products attached)`);
+    } else {
+      const categories = this.getCategoriesWithSubcategories().filter((c) => c.id !== id);
+      this.setItem(STORAGE_KEYS.CATEGORIES, categories);
+      this.logAdminAction('DELETE_CATEGORY', 'category', id, `Removed empty category #${id}`);
+    }
+  }
+
+  public addSubcategory(categoryId: string, name: string) {
+    const categories = this.getCategoriesWithSubcategories();
+    const updated = categories.map((c) => {
+      if (c.id === categoryId) {
+        const subs = c.subcategories || [];
+        const newSub = {
+          id: generateId('sub'),
+          categoryId,
+          name: name.trim(),
+          slug: name.trim().toLowerCase().replace(/\s+/g, '-'),
+          isActive: true,
+          sortOrder: subs.length + 1,
+        };
+        return { ...c, subcategories: [...subs, newSub] };
+      }
+      return c;
+    });
+    this.setItem(STORAGE_KEYS.CATEGORIES, updated);
+  }
+
+  public updateSubcategory(categoryId: string, subId: string, updates: Partial<CategoryWithSubcategories['subcategories'][0]>) {
+    const categories = this.getCategoriesWithSubcategories();
+    const updated = categories.map((c) => {
+      if (c.id === categoryId) {
+        const subs = (c.subcategories || []).map((s) => (s.id === subId ? { ...s, ...updates } : s));
+        return { ...c, subcategories: subs };
+      }
+      return c;
+    });
+    this.setItem(STORAGE_KEYS.CATEGORIES, updated);
+  }
+
+  public deleteSubcategory(categoryId: string, subId: string) {
+    const categories = this.getCategoriesWithSubcategories();
+    const updated = categories.map((c) => {
+      if (c.id === categoryId) {
+        const subs = (c.subcategories || []).filter((s) => s.id !== subId);
+        return { ...c, subcategories: subs };
+      }
+      return c;
+    });
+    this.setItem(STORAGE_KEYS.CATEGORIES, updated);
   }
 
   // --- ADMIN PLATFORM OPERATIONS ---

@@ -693,16 +693,7 @@ export function PublicStorefront({
                       <span className="absolute top-3 left-3 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
                         {p.brand}
                       </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveProductModal(sp);
-                        }}
-                        className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-lg bg-white/90 text-neutral-800 shadow-md backdrop-blur-xs hover:bg-white"
-                        title="View Details"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
+
                     </div>
 
                     <div className="w-full sm:w-1/2 p-4 sm:p-5 flex flex-col justify-between space-y-3 min-w-0">
@@ -728,13 +719,6 @@ export function PublicStorefront({
                           {formatCurrency(p.price)}
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            onClick={() => setActiveProductModal(sp)}
-                            className="p-2 rounded-lg border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100 transition-colors"
-                            title="View Product Details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
                           <button
                             onClick={() => onAddToCart && onAddToCart(p, coverImage, sp.id)}
                             className={`flex items-center gap-1.5 ${getButtonShapeClass()} ${getButtonSizeClass()}`}
@@ -805,13 +789,7 @@ export function PublicStorefront({
                           </span>
                         </div>
 
-                        <button
-                          onClick={() => setActiveProductModal(sp)}
-                          className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-lg bg-white/90 text-neutral-800 shadow-md backdrop-blur-xs hover:bg-white"
-                          title="Quick View Details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
+
                       </div>
 
                       {/* Card Body */}

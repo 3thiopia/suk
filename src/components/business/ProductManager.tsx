@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { CategorySubcategorySelector } from '../common/CategorySubcategorySelector';
 import { CompactFilterSection, FilterChip } from '../common/CompactFilterSection';
 import {
   Plus,
@@ -121,8 +122,8 @@ export function ProductManager() {
   const [formData, setFormData] = useState({
     title: '',
     brand: '',
-    category: 'Electronics & Audio',
-    subcategory: 'Headphones & Speakers',
+    category: 'Electronics',
+    subcategory: 'Phones',
     description: '',
     price: 99.0,
     costPrice: 45.0,
@@ -234,8 +235,8 @@ export function ProductManager() {
     setFormData({
       title: '',
       brand: business.businessName,
-      category: 'Electronics & Audio',
-      subcategory: 'Headphones & Speakers',
+      category: 'Electronics',
+      subcategory: 'Phones',
       description: '',
       price: 149.0,
       costPrice: 60.0,
@@ -579,7 +580,13 @@ export function ProductManager() {
               >
                 {/* Top Media & Badges */}
                 <div>
-                  <div className="relative h-48 w-full overflow-hidden rounded-t-2xl bg-neutral-100">
+                  <div
+                    onClick={() => {
+                      setViewingProduct(p);
+                      setActiveInspectorImage(p.images[0] || SAMPLE_PRODUCT_IMAGES[0]);
+                    }}
+                    className="relative h-48 w-full overflow-hidden rounded-t-2xl bg-neutral-100 cursor-pointer"
+                  >
                     <img
                       src={p.images[0] || SAMPLE_PRODUCT_IMAGES[0]}
                       alt={p.title}
@@ -698,7 +705,13 @@ export function ProductManager() {
                       </span>
                     </div>
 
-                    <h3 className="font-bold text-neutral-900 text-sm leading-snug line-clamp-2">
+                    <h3
+                      onClick={() => {
+                        setViewingProduct(p);
+                        setActiveInspectorImage(p.images[0] || SAMPLE_PRODUCT_IMAGES[0]);
+                      }}
+                      className="font-bold text-neutral-900 text-sm leading-snug line-clamp-2 cursor-pointer hover:underline"
+                    >
                       {p.title}
                     </h3>
 
@@ -784,16 +797,6 @@ export function ProductManager() {
 
                 {/* Card Footer Quick Action Buttons */}
                 <div className="flex items-center border-t border-neutral-100 p-2.5 bg-neutral-50/50 rounded-b-2xl gap-1.5">
-                  <button
-                    onClick={() => {
-                      setViewingProduct(p);
-                      setActiveInspectorImage(p.images[0] || SAMPLE_PRODUCT_IMAGES[0]);
-                    }}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-bold text-neutral-700 shadow-2xs hover:bg-neutral-100 transition-colors"
-                  >
-                    <Eye className="h-3.5 w-3.5 text-neutral-500" />
-                    <span>View</span>
-                  </button>
                   <button
                     onClick={() => handleOpenEditModal(p)}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-bold text-neutral-800 shadow-2xs hover:bg-neutral-100 transition-colors"
@@ -1217,113 +1220,113 @@ export function ProductManager() {
         subtitle="Business Owner control. Updates automatically sync across all reseller storefronts."
         maxWidth="2xl"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-bold text-neutral-800">Product Title *</label>
-              <input
-                type="text"
-                required
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="e.g. Apex H1 Wireless Spatial Headphones"
-                className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 p-2.5 text-xs text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900"
-              />
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Section 1: Basic Details */}
+          <div className="rounded-2xl border border-neutral-200 bg-neutral-50/50 p-3.5 sm:p-4 space-y-3.5">
+            <div className="flex items-center gap-2 border-b border-neutral-200/80 pb-2">
+              <Package className="h-4 w-4 text-emerald-600 shrink-0" />
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-neutral-800">1. Basic Details</h4>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-neutral-800">Brand Name *</label>
-              <input
-                type="text"
-                required
-                value={formData.brand}
-                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 p-2.5 text-xs text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-bold text-neutral-800">Category *</label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 p-2.5 text-xs text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900"
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-800">Subcategory</label>
-              <input
-                type="text"
-                value={formData.subcategory}
-                onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
-                placeholder="e.g. Headphones & Speakers"
-                className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 p-2.5 text-xs text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <label className="block text-xs font-bold text-neutral-800">Retail Price ($) *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 p-2.5 text-xs text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-800">Cost Price ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.costPrice}
-                onChange={(e) => setFormData({ ...formData, costPrice: parseFloat(e.target.value) || 0 })}
-                className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 p-2.5 text-xs text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-800">Inventory Stock *</label>
-              <input
-                type="number"
-                min="0"
-                required
-                value={formData.stock}
-                onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
-                className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 p-2.5 text-xs text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900"
-              />
-            </div>
-          </div>
-
-          {/* Reseller Commission Configuration */}
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-xs font-bold text-emerald-950">Reseller Commission Structure</label>
-                <p className="text-[11px] text-emerald-800">Configure earnings for resellers promoting this item.</p>
+                <label className="block text-xs font-bold text-neutral-800 mb-1">Product Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="e.g. Apex H1 Wireless Headphones"
+                  className="w-full rounded-xl border border-neutral-300 bg-white min-h-[42px] px-3 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs"
+                />
               </div>
-              <div className="flex items-center rounded-lg border border-emerald-200 bg-white p-0.5 text-xs">
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-800 mb-1">Brand Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.brand}
+                  onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                  placeholder="e.g. Apex Audio"
+                  className="w-full rounded-xl border border-neutral-300 bg-white min-h-[42px] px-3 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs"
+                />
+              </div>
+            </div>
+
+            <CategorySubcategorySelector
+              selectedCategory={formData.category}
+              selectedSubcategory={formData.subcategory}
+              onChangeCategory={(cat) => setFormData({ ...formData, category: cat })}
+              onChangeSubcategory={(sub) => setFormData({ ...formData, subcategory: sub })}
+            />
+          </div>
+
+          {/* Section 2: Pricing & Inventory */}
+          <div className="rounded-2xl border border-neutral-200 bg-neutral-50/50 p-3.5 sm:p-4 space-y-3.5">
+            <div className="flex items-center gap-2 border-b border-neutral-200/80 pb-2">
+              <Coins className="h-4 w-4 text-emerald-600 shrink-0" />
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-neutral-800">2. Pricing & Inventory</h4>
+            </div>
+
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+              <div>
+                <label className="block text-xs font-bold text-neutral-800 mb-1">Retail Price ($) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                  className="w-full rounded-xl border border-neutral-300 bg-white min-h-[42px] px-3 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-800 mb-1">Cost Price ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.costPrice}
+                  onChange={(e) => setFormData({ ...formData, costPrice: parseFloat(e.target.value) || 0 })}
+                  className="w-full rounded-xl border border-neutral-300 bg-white min-h-[42px] px-3 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-800 mb-1">Stock Quantity *</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={formData.stock}
+                  onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
+                  className="w-full rounded-xl border border-neutral-300 bg-white min-h-[42px] px-3 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Reseller Commission Configuration */}
+          <div className="rounded-2xl border border-emerald-300/80 bg-emerald-50/60 p-3.5 sm:p-4 space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200 pb-2.5">
+              <div>
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                  3. Reseller Earnings & Commission
+                </h4>
+                <p className="text-[11px] text-emerald-800 mt-0.5">Configure profit margins for resellers promoting this item.</p>
+              </div>
+
+              <div className="flex items-center rounded-xl border border-emerald-300 bg-white p-1 text-xs shrink-0 self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, commissionType: 'percentage' })}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all min-h-[36px] ${
                     formData.commissionType === 'percentage'
-                      ? 'bg-emerald-600 text-white shadow-sm'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
                       : 'text-neutral-600 hover:text-neutral-900'
                   }`}
                 >
@@ -1332,9 +1335,9 @@ export function ProductManager() {
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, commissionType: 'fixed' })}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all min-h-[36px] ${
                     formData.commissionType === 'fixed'
-                      ? 'bg-emerald-600 text-white shadow-sm'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
                       : 'text-neutral-600 hover:text-neutral-900'
                   }`}
                 >
@@ -1346,7 +1349,7 @@ export function ProductManager() {
             <div className="grid gap-3 sm:grid-cols-2 items-center">
               {formData.commissionType === 'percentage' ? (
                 <div>
-                  <label className="block text-[11px] font-bold text-emerald-900">Commission Rate (%)</label>
+                  <label className="block text-xs font-bold text-emerald-900 mb-1">Commission Rate (%)</label>
                   <input
                     type="number"
                     step="0.5"
@@ -1354,26 +1357,26 @@ export function ProductManager() {
                     max="100"
                     value={formData.commissionRate}
                     onChange={(e) => setFormData({ ...formData, commissionRate: parseFloat(e.target.value) || 0 })}
-                    className="mt-1 w-full rounded-lg border border-emerald-200 bg-white p-2 text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full rounded-xl border border-emerald-300 bg-white min-h-[42px] px-3 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 shadow-2xs"
                   />
                 </div>
               ) : (
                 <div>
-                  <label className="block text-[11px] font-bold text-emerald-900">Fixed Commission ($)</label>
+                  <label className="block text-xs font-bold text-emerald-900 mb-1">Fixed Commission ($)</label>
                   <input
                     type="number"
                     step="0.5"
                     min="0"
                     value={formData.commissionAmount}
                     onChange={(e) => setFormData({ ...formData, commissionAmount: parseFloat(e.target.value) || 0 })}
-                    className="mt-1 w-full rounded-lg border border-emerald-200 bg-white p-2 text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full rounded-xl border border-emerald-300 bg-white min-h-[42px] px-3 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 shadow-2xs"
                   />
                 </div>
               )}
 
-              <div className="rounded-lg bg-white p-2.5 border border-emerald-200 flex items-center justify-between">
-                <span className="text-xs text-neutral-600 font-medium">Reseller Earns Per Sale:</span>
-                <span className="text-sm font-extrabold text-emerald-700">
+              <div className="rounded-xl bg-white p-3 border border-emerald-200/90 flex items-center justify-between shadow-2xs">
+                <span className="text-xs text-neutral-700 font-bold">Reseller Earns Per Sale:</span>
+                <span className="text-base font-black text-emerald-700">
                   {formatCurrency(
                     formData.commissionType === 'fixed'
                       ? formData.commissionAmount
@@ -1384,87 +1387,105 @@ export function ProductManager() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-neutral-800">Product Description *</label>
-            <textarea
-              rows={3}
-              required
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Describe product craftsmanship, specifications, warranty, features..."
-              className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 p-2.5 text-xs text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900"
-            />
+          {/* Section 4: Description & Tags */}
+          <div className="rounded-2xl border border-neutral-200 bg-neutral-50/50 p-3.5 sm:p-4 space-y-3.5">
+            <div className="flex items-center gap-2 border-b border-neutral-200/80 pb-2">
+              <Info className="h-4 w-4 text-emerald-600 shrink-0" />
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-neutral-800">4. Description & Tags</h4>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-neutral-800 mb-1">Product Description *</label>
+              <textarea
+                rows={3}
+                required
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Describe product craftsmanship, specifications, warranty, features..."
+                className="w-full rounded-xl border border-neutral-300 bg-white p-3 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-bold text-neutral-800 mb-1">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as ProductStatus })}
+                  className="w-full rounded-xl border border-neutral-300 bg-white min-h-[42px] px-3 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs"
+                >
+                  <option value="active">Active (Available for Resellers)</option>
+                  <option value="out_of_stock">Out of Stock</option>
+                  <option value="archived">Archived (Hidden from catalog)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-800 mb-1">Search Tags (comma separated)</label>
+                <input
+                  type="text"
+                  value={formData.tags}
+                  onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                  placeholder="wireless, Bluetooth, audio"
+                  className="w-full rounded-xl border border-neutral-300 bg-white min-h-[42px] px-3 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Multi Image Direct Upload */}
-          <div>
+          {/* Section 5: Multi Image Direct Upload */}
+          <div className="rounded-2xl border border-neutral-200 bg-neutral-50/50 p-3.5 sm:p-4 space-y-3.5">
+            <div className="flex items-center gap-2 border-b border-neutral-200/80 pb-2">
+              <ImageIcon className="h-4 w-4 text-emerald-600 shrink-0" />
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-neutral-800">5. Product Gallery & Cover Photo</h4>
+            </div>
+
             <MultiImageUploader
               value={formData.images}
               onChange={(newImages) => setFormData({ ...formData, images: newImages })}
               label="Product Images & Photography *"
-              description="Upload high-res product photos directly. Drag & reorder to choose cover photo."
-              maxImages={8}
+              description="Select multiple product photos from your device (Max 5 images total). Tap ⋮ on any image to set as Primary Cover or Delete."
+              maxImages={5}
             />
 
             {/* Quick Sample Photography */}
-            <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50/70 p-3">
-              <span className="text-[11px] font-bold text-neutral-600 block mb-1.5">Quick Sample Photos:</span>
+            <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3 shadow-2xs">
+              <span className="text-[11px] font-bold text-neutral-600 block mb-2">Or select from Quick Sample Photos:</span>
               <div className="flex flex-wrap gap-2">
                 {SAMPLE_PRODUCT_IMAGES.map((imgUrl, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => {
+                      if (formData.images.length >= 5) {
+                        alert('Maximum 5 images allowed per product. Remove an image to add a new one.');
+                        return;
+                      }
                       if (!formData.images.includes(imgUrl)) {
                         setFormData({ ...formData, images: [...formData.images, imgUrl] });
                       }
                     }}
-                    className="relative group overflow-hidden rounded-lg border border-neutral-200 hover:border-emerald-500"
+                    className="relative group overflow-hidden rounded-xl border border-neutral-200 hover:border-emerald-500 active:scale-95 transition-all"
                   >
-                    <img src={imgUrl} alt="Preset" className="h-10 w-10 object-cover group-hover:scale-110 transition-transform" />
+                    <img src={imgUrl} alt="Preset" className="h-11 w-11 object-cover group-hover:scale-110 transition-transform" />
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 pt-2">
-            <div>
-              <label className="block text-xs font-bold text-neutral-800">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as ProductStatus })}
-                className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 p-2.5 text-xs text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900"
-              >
-                <option value="active">Active (Available for Resellers)</option>
-                <option value="out_of_stock">Out of Stock</option>
-                <option value="archived">Archived (Hidden from catalog)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-800">Tags (comma separated)</label>
-              <input
-                type="text"
-                value={formData.tags}
-                onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                placeholder="wireless, Bluetooth, audio"
-                className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 p-2.5 text-xs text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-neutral-100 pt-4">
+          {/* Action Buttons */}
+          <div className="sticky bottom-0 bg-white pt-3 pb-1 border-t border-neutral-200 flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-xs font-bold text-neutral-700 hover:bg-neutral-50"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white min-h-[44px] px-5 py-2.5 text-xs sm:text-sm font-bold text-neutral-700 hover:bg-neutral-50 active:scale-95 transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="rounded-xl bg-neutral-900 px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-neutral-800"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center rounded-xl bg-neutral-900 min-h-[44px] px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-neutral-800 active:scale-95 transition-all"
             >
               {editingProduct ? 'Save & Sync to Resellers' : 'Create Product'}
             </button>
