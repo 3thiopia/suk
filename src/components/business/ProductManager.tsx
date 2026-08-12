@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { CategorySubcategorySelector } from '../common/CategorySubcategorySelector';
+import { getSubcategoriesForCategory } from '../../data/categoriesData';
 import { CompactFilterSection, FilterChip } from '../common/CompactFilterSection';
 import {
   Plus,
@@ -101,6 +102,12 @@ export function ProductManager() {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(new Set());
 
+  // Form Validation States & Scroll Ref
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [subcategoryError, setSubcategoryError] = useState<string | null>(null);
+  const formTopRef = useRef<HTMLDivElement>(null);
+
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -122,8 +129,8 @@ export function ProductManager() {
   const [formData, setFormData] = useState({
     title: '',
     brand: '',
-    category: 'Electronics',
-    subcategory: 'Phones',
+    category: '',
+    subcategory: '',
     description: '',
     price: 99.0,
     costPrice: 45.0,
@@ -141,7 +148,7 @@ export function ProductManager() {
   }
 
   const products = storage.getProductsByBusinessId(business.id);
-  const categories = storage.getCategories();
+  const categories = storage.getCategoriesWithSubcategories();
   const hiddenProductsCount = products.filter((p) => p.isHidden).length;
 
   // Filter & Sort Logic
@@ -232,11 +239,14 @@ export function ProductManager() {
 
   const handleOpenCreateModal = () => {
     setEditingProduct(null);
+    setValidationError(null);
+    setCategoryError(null);
+    setSubcategoryError(null);
     setFormData({
       title: '',
       brand: business.businessName,
-      category: 'Electronics',
-      subcategory: 'Phones',
+      category: '',
+      subcategory: '',
       description: '',
       price: 149.0,
       costPrice: 60.0,
@@ -253,6 +263,9 @@ export function ProductManager() {
 
   const handleOpenEditModal = (product: Product) => {
     setEditingProduct(product);
+    setValidationError(null);
+    setCategoryError(null);
+    setSubcategoryError(null);
     const hasFixedAmount = typeof product.commissionAmount === 'number' && product.commissionAmount > 0;
     setFormData({
       title: product.title,
@@ -299,6 +312,38 @@ export function ProductManager() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Category validation
+    if (!formData.category || !formData.category.trim()) {
+      const msg = 'Please select a product category.';
+      setValidationError(msg);
+      setCategoryError(msg);
+      setSubcategoryError(null);
+
+      setTimeout(() => {
+        formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+      return;
+    }
+
+    // 2. Subcategory validation (only required if selected category has available subcategories)
+    const availableSubs = getSubcategoriesForCategory(categories, formData.category);
+    if (availableSubs.length > 0 && (!formData.subcategory || !formData.subcategory.trim())) {
+      const msg = 'Please select a subcategory.';
+      setValidationError(msg);
+      setCategoryError(null);
+      setSubcategoryError(msg);
+
+      setTimeout(() => {
+        formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+      return;
+    }
+
+    // Reset errors if validation passes
+    setValidationError(null);
+    setCategoryError(null);
+    setSubcategoryError(null);
 
     const imageList = formData.images.filter((img) => img.trim().length > 0);
     if (imageList.length === 0) {
@@ -573,6 +618,8 @@ export function ProductManager() {
               <div
                 key={p.id}
                 className={`group relative flex flex-col justify-between rounded-2xl border transition-all duration-200 bg-white ${
+                  openDropdownId === p.id ? 'z-30 ring-2 ring-neutral-900/10' : 'z-0'
+                } ${
                   p.isHidden
                     ? 'border-amber-300 bg-amber-50/20 shadow-2xs'
                     : 'border-neutral-200/90 shadow-2xs hover:shadow-md hover:border-neutral-300'
@@ -580,113 +627,141 @@ export function ProductManager() {
               >
                 {/* Top Media & Badges */}
                 <div>
-                  <div
-                    onClick={() => {
-                      setViewingProduct(p);
-                      setActiveInspectorImage(p.images[0] || SAMPLE_PRODUCT_IMAGES[0]);
-                    }}
-                    className="relative h-48 w-full overflow-hidden rounded-t-2xl bg-neutral-100 cursor-pointer"
-                  >
-                    <img
-                      src={p.images[0] || SAMPLE_PRODUCT_IMAGES[0]}
-                      alt={p.title}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
+                  <div className="relative rounded-t-2xl">
+                    {/* Image Box (Overflow hidden strictly for image zoom) */}
+                    <div
+                      onClick={() => {
+                        setViewingProduct(p);
+                        setActiveInspectorImage(p.images[0] || SAMPLE_PRODUCT_IMAGES[0]);
+                      }}
+                      className="relative h-48 w-full overflow-hidden rounded-t-2xl bg-neutral-100 cursor-pointer"
+                    >
+                      <img
+                        src={p.images[0] || SAMPLE_PRODUCT_IMAGES[0]}
+                        alt={p.title}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
 
-                    {/* Overlay Badges */}
-                    <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 z-10">
+                      {/* Image Count Indicator */}
+                      {p.images && p.images.length > 1 && (
+                        <span className="absolute bottom-2.5 left-3 rounded-full bg-neutral-900/75 backdrop-blur-md px-2 py-0.5 text-[10px] font-bold text-white flex items-center gap-1">
+                          <ImageIcon className="h-3 w-3" />
+                          {p.images.length} photos
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Overlay Badges (Top Left) */}
+                    <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 z-10 pointer-events-none">
                       <ProductStatusBadge status={p.status} isHidden={p.isHidden} />
                       {p.isHidden && p.appealStatus && <AppealStatusBadge status={p.appealStatus} />}
                     </div>
 
-                    {/* Image Count Indicator */}
-                    {p.images && p.images.length > 1 && (
-                      <span className="absolute bottom-2.5 left-3 rounded-full bg-neutral-900/75 backdrop-blur-md px-2 py-0.5 text-[10px] font-bold text-white flex items-center gap-1">
-                        <ImageIcon className="h-3 w-3" />
-                        {p.images.length} photos
-                      </span>
-                    )}
-
-                    {/* Quick Action Dropdown Trigger (Top Right) */}
-                    <div className="absolute top-3 right-3 z-20">
+                    {/* Quick Action Dropdown Trigger & Menu (Top Right - Outside overflow clipping container) */}
+                    <div className="absolute top-3 right-3 z-30">
                       <div className="relative">
                         <button
-                          onClick={() => setOpenDropdownId(openDropdownId === p.id ? null : p.id)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-neutral-700 shadow-sm backdrop-blur-md hover:bg-white hover:text-neutral-900 transition-colors"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdownId(openDropdownId === p.id ? null : p.id);
+                          }}
+                          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-neutral-700 shadow-md backdrop-blur-md hover:bg-white hover:text-neutral-900 active:scale-95 transition-all cursor-pointer"
                           aria-label="Quick Actions Menu"
                         >
                           <MoreVertical className="h-4 w-4" />
                         </button>
 
-                        {/* Dropdown Menu */}
+                        {/* Dropdown Menu - Floats above complete product card & adjacent grid cards */}
                         {openDropdownId === p.id && (
                           <>
-                            <div className="fixed inset-0 z-30" onClick={() => setOpenDropdownId(null)} />
-                            <div className="absolute right-0 mt-1 w-44 z-40 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl text-xs font-medium text-neutral-700 animate-in fade-in zoom-in-95">
+                            <div
+                              className="fixed inset-0 z-40 bg-transparent"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenDropdownId(null);
+                              }}
+                            />
+                            <div className="absolute right-0 top-full mt-1.5 w-48 z-50 rounded-2xl border border-neutral-200 bg-white/98 p-1.5 shadow-2xl backdrop-blur-md text-xs font-semibold text-neutral-700 animate-in fade-in zoom-in-95">
                               <button
-                                onClick={() => {
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setViewingProduct(p);
                                   setActiveInspectorImage(p.images[0] || SAMPLE_PRODUCT_IMAGES[0]);
                                   setOpenDropdownId(null);
                                 }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-neutral-100 hover:text-neutral-900"
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-neutral-100 hover:text-neutral-900 cursor-pointer transition-colors"
                               >
-                                <Eye className="h-3.5 w-3.5 text-neutral-500" />
+                                <Eye className="h-4 w-4 text-neutral-500 shrink-0" />
                                 <span>View Details</span>
                               </button>
                               <button
-                                onClick={() => {
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   handleOpenEditModal(p);
                                   setOpenDropdownId(null);
                                 }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-neutral-100 hover:text-neutral-900"
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-blue-50 hover:text-blue-900 text-neutral-800 cursor-pointer transition-colors"
                               >
-                                <Edit3 className="h-3.5 w-3.5 text-blue-600" />
+                                <Edit3 className="h-4 w-4 text-blue-600 shrink-0" />
                                 <span>Edit Product</span>
                               </button>
                               <button
-                                onClick={() => handleDuplicateProduct(p)}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-neutral-100 hover:text-neutral-900"
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDuplicateProduct(p);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-emerald-50 hover:text-emerald-900 text-neutral-800 cursor-pointer transition-colors"
                               >
-                                <Copy className="h-3.5 w-3.5 text-emerald-600" />
+                                <Copy className="h-4 w-4 text-emerald-600 shrink-0" />
                                 <span>Duplicate</span>
                               </button>
 
                               {p.isHidden ? (
                                 <button
-                                  onClick={() => {
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     setAppealModalProduct(p);
                                     setOpenDropdownId(null);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-amber-800 hover:bg-amber-50 font-bold"
+                                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-amber-900 hover:bg-amber-50 font-bold cursor-pointer transition-colors"
                                 >
-                                  <Scale className="h-3.5 w-3.5 text-amber-600" />
+                                  <Scale className="h-4 w-4 text-amber-600 shrink-0" />
                                   <span>Appeal Decision</span>
                                 </button>
                               ) : (
                                 <button
-                                  onClick={() => {
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     const nextStatus = p.status === 'active' ? 'out_of_stock' : 'active';
                                     storage.updateProduct(p.id, { status: nextStatus });
                                     showToast(`Marked "${p.title}" as ${nextStatus.replace('_', ' ')}`);
                                     setOpenDropdownId(null);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-neutral-100 hover:text-neutral-900"
+                                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-neutral-100 hover:text-neutral-900 cursor-pointer transition-colors"
                                 >
-                                  <Archive className="h-3.5 w-3.5 text-neutral-500" />
+                                  <Archive className="h-4 w-4 text-neutral-500 shrink-0" />
                                   <span>{p.status === 'active' ? 'Mark Out of Stock' : 'Mark Active'}</span>
                                 </button>
                               )}
 
                               <div className="my-1 border-t border-neutral-100" />
                               <button
-                                onClick={() => {
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setOpenDropdownId(null);
                                   handleDelete(p.id, p.title);
                                 }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-rose-600 hover:bg-rose-50 font-bold"
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-rose-600 hover:bg-rose-50 font-bold cursor-pointer transition-colors"
                               >
-                                <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+                                <Trash2 className="h-4 w-4 text-rose-600 shrink-0" />
                                 <span>Delete Product</span>
                               </button>
                             </div>
@@ -1215,12 +1290,32 @@ export function ProductManager() {
       {/* EDIT / CREATE FORM MODAL */}
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setValidationError(null);
+          setCategoryError(null);
+          setSubcategoryError(null);
+        }}
         title={editingProduct ? 'Edit Brand Product' : 'Add New Brand Product'}
         subtitle="Business Owner control. Updates automatically sync across all reseller storefronts."
         maxWidth="2xl"
       >
         <form onSubmit={handleSubmit} className="space-y-5">
+          <div ref={formTopRef} />
+
+          {/* Top Validation Error Banner */}
+          {validationError && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-2xs flex items-start gap-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="rounded-xl bg-rose-100 p-2 text-rose-600 shrink-0 mt-0.5">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-rose-900">Validation Error</h4>
+                <p className="mt-0.5 text-xs sm:text-sm font-bold text-rose-800">{validationError}</p>
+              </div>
+            </div>
+          )}
+
           {/* Section 1: Basic Details */}
           <div className="rounded-2xl border border-neutral-200 bg-neutral-50/50 p-3.5 sm:p-4 space-y-3.5">
             <div className="flex items-center gap-2 border-b border-neutral-200/80 pb-2">
@@ -1257,8 +1352,20 @@ export function ProductManager() {
             <CategorySubcategorySelector
               selectedCategory={formData.category}
               selectedSubcategory={formData.subcategory}
-              onChangeCategory={(cat) => setFormData({ ...formData, category: cat })}
-              onChangeSubcategory={(sub) => setFormData({ ...formData, subcategory: sub })}
+              onChangeCategory={(cat) => {
+                setFormData((prev) => ({ ...prev, category: cat, subcategory: '' }));
+                setCategoryError(null);
+                setSubcategoryError(null);
+                setValidationError(null);
+              }}
+              onChangeSubcategory={(sub) => {
+                setFormData((prev) => ({ ...prev, subcategory: sub }));
+                setSubcategoryError(null);
+                setValidationError(null);
+              }}
+              categoriesList={categories}
+              categoryError={categoryError}
+              subcategoryError={subcategoryError}
             />
           </div>
 
@@ -1269,7 +1376,7 @@ export function ProductManager() {
               <h4 className="text-xs font-extrabold uppercase tracking-wider text-neutral-800">2. Pricing & Inventory</h4>
             </div>
 
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-bold text-neutral-800 mb-1">Retail Price ($) *</label>
                 <input
@@ -1279,18 +1386,6 @@ export function ProductManager() {
                   required
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                  className="w-full rounded-xl border border-neutral-300 bg-white min-h-[42px] px-3 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-neutral-800 mb-1">Cost Price ($)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.costPrice}
-                  onChange={(e) => setFormData({ ...formData, costPrice: parseFloat(e.target.value) || 0 })}
                   className="w-full rounded-xl border border-neutral-300 bg-white min-h-[42px] px-3 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs"
                 />
               </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ChevronDown, Check, FolderTree, Tag, X } from 'lucide-react';
+import { Search, ChevronDown, Check, FolderTree, Tag, X, AlertCircle } from 'lucide-react';
 import { CategoryWithSubcategories, INITIAL_PLATFORM_CATEGORIES, getSubcategoriesForCategory } from '../../data/categoriesData';
 import { Subcategory } from '../../types';
 
@@ -11,6 +11,9 @@ interface CategorySubcategorySelectorProps {
   categoriesList?: CategoryWithSubcategories[];
   label?: string;
   required?: boolean;
+  isLoading?: boolean;
+  categoryError?: string | null;
+  subcategoryError?: string | null;
 }
 
 export function CategorySubcategorySelector({
@@ -21,6 +24,9 @@ export function CategorySubcategorySelector({
   categoriesList = INITIAL_PLATFORM_CATEGORIES,
   label = 'Category & Subcategory *',
   required = true,
+  isLoading = false,
+  categoryError = null,
+  subcategoryError = null,
 }: CategorySubcategorySelectorProps) {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isSubcategoryModalOpen, setIsSubcategoryModalOpen] = useState(false);
@@ -28,7 +34,7 @@ export function CategorySubcategorySelector({
   const [subSearch, setSubSearch] = useState('');
 
   // Active categories only
-  const activeCategories = categoriesList.filter((c) => c.isActive !== false);
+  const activeCategories = (categoriesList || []).filter((c) => c.isActive !== false);
 
   // Ensure 'Other' is always at the bottom of the category list
   const sortedCategories = [...activeCategories].sort((a, b) => {
@@ -42,20 +48,16 @@ export function CategorySubcategorySelector({
     (cat.description && cat.description.toLowerCase().includes(catSearch.toLowerCase()))
   );
 
-  const availableSubcategories = getSubcategoriesForCategory(categoriesList, selectedCategory);
+  const availableSubcategories = getSubcategoriesForCategory(categoriesList || [], selectedCategory);
 
   const filteredSubcategories = availableSubcategories.filter((sub) =>
     sub.name.toLowerCase().includes(subSearch.toLowerCase())
   );
 
   const handleSelectCategory = (catName: string) => {
-    if (catName !== selectedCategory) {
-      onChangeCategory(catName);
-      // Automatically default subcategory to first available subcategory or 'General'
-      const subs = getSubcategoriesForCategory(categoriesList, catName);
-      const defaultSub = subs.length > 0 ? subs[0].name : 'General';
-      onChangeSubcategory(defaultSub);
-    }
+    onChangeCategory(catName);
+    // Explicitly reset subcategory when category changes as per user requirements
+    onChangeSubcategory('');
     setIsCategoryModalOpen(false);
     setCatSearch('');
   };
@@ -77,15 +79,30 @@ export function CategorySubcategorySelector({
           <div className="relative">
             <button
               type="button"
+              disabled={isLoading || activeCategories.length === 0}
               onClick={() => setIsCategoryModalOpen(true)}
-              className="w-full flex items-center justify-between rounded-xl border border-neutral-300 bg-white min-h-[42px] px-3.5 py-2.5 text-left text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs cursor-pointer hover:border-neutral-400"
+              className={`w-full flex items-center justify-between rounded-xl border min-h-[42px] px-3.5 py-2.5 text-left text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 transition-all shadow-2xs cursor-pointer hover:border-neutral-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-neutral-100 ${
+                categoryError
+                  ? 'border-rose-500 bg-rose-50/30 ring-2 ring-rose-200 focus:ring-rose-500'
+                  : 'border-neutral-300 bg-white focus:ring-neutral-900'
+              }`}
             >
               <span className={`truncate font-semibold ${selectedCategory ? 'text-neutral-900' : 'text-neutral-400'}`}>
-                {selectedCategory || 'Select Category...'}
+                {isLoading
+                  ? 'Loading categories...'
+                  : activeCategories.length === 0
+                  ? 'No categories available'
+                  : selectedCategory || 'Select Category...'}
               </span>
               <ChevronDown className="h-4 w-4 text-neutral-500 shrink-0 ml-2" />
             </button>
           </div>
+          {categoryError && (
+            <p className="mt-1.5 text-xs font-bold text-rose-600 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-600" />
+              <span>{categoryError}</span>
+            </p>
+          )}
         </div>
 
         {/* Subcategory Field */}
@@ -96,10 +113,14 @@ export function CategorySubcategorySelector({
           <div className="relative">
             <button
               type="button"
-              disabled={!selectedCategory}
+              disabled={!selectedCategory || isLoading}
               onClick={() => setIsSubcategoryModalOpen(true)}
-              className={`w-full flex items-center justify-between rounded-xl border border-neutral-300 bg-white min-h-[42px] px-3.5 py-2.5 text-left text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all shadow-2xs cursor-pointer hover:border-neutral-400 ${
-                !selectedCategory ? 'opacity-50 cursor-not-allowed bg-neutral-100' : ''
+              className={`w-full flex items-center justify-between rounded-xl border min-h-[42px] px-3.5 py-2.5 text-left text-xs sm:text-sm text-neutral-900 focus:outline-none focus:ring-2 transition-all shadow-2xs cursor-pointer hover:border-neutral-400 ${
+                !selectedCategory || isLoading ? 'opacity-50 cursor-not-allowed bg-neutral-100 border-neutral-300' : ''
+              } ${
+                subcategoryError
+                  ? 'border-rose-500 bg-rose-50/30 ring-2 ring-rose-200 focus:ring-rose-500'
+                  : 'border-neutral-300 bg-white focus:ring-neutral-900'
               }`}
             >
               <span className={`truncate font-semibold ${selectedSubcategory ? 'text-neutral-900' : 'text-neutral-400'}`}>
@@ -108,6 +129,12 @@ export function CategorySubcategorySelector({
               <ChevronDown className="h-4 w-4 text-neutral-500 shrink-0 ml-2" />
             </button>
           </div>
+          {subcategoryError && (
+            <p className="mt-1.5 text-xs font-bold text-rose-600 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-600" />
+              <span>{subcategoryError}</span>
+            </p>
+          )}
         </div>
       </div>
 

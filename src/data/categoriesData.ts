@@ -322,6 +322,7 @@ export function normalizeCategoryName(rawCategory?: string): string {
 }
 
 export function getSubcategoriesForCategory(categoriesList: CategoryWithSubcategories[], categoryName: string): Subcategory[] {
+  if (!categoryName || !categoryName.trim()) return [];
   const normCat = normalizeCategoryName(categoryName);
   const found = categoriesList.find((c) => c.name === normCat || c.name.toLowerCase() === categoryName.toLowerCase());
   if (found && found.subcategories && found.subcategories.length > 0) {
