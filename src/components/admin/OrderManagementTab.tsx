@@ -24,6 +24,7 @@ import { Order } from '../../types';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { OrderTimelineModal } from './OrderTimelineModal';
 import { OrderStatusBadge } from '../common/Badge';
+import { PhoneActionButtons } from '../common/PhoneActionButtons';
 
 interface OrderManagementTabProps {
   initialOrderId?: string | null;
@@ -271,11 +272,8 @@ export function OrderManagementTab({ initialOrderId }: OrderManagementTabProps) 
                         </td>
 
                         {/* Business Owner Phone Number */}
-                        <td className="py-3.5 px-4 whitespace-nowrap font-mono text-neutral-700">
-                          <div className="flex items-center gap-1.5">
-                            <Phone className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
-                            <span>{ownerPhone}</span>
-                          </div>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <PhoneActionButtons phone={ownerPhone} showNumber size="xs" />
                         </td>
 
                         {/* Reseller */}
@@ -289,11 +287,8 @@ export function OrderManagementTab({ initialOrderId }: OrderManagementTabProps) 
                         </td>
 
                         {/* Customer Phone Number */}
-                        <td className="py-3.5 px-4 whitespace-nowrap font-mono text-neutral-700">
-                          <div className="flex items-center gap-1.5">
-                            <Phone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                            <span className="font-semibold">{o.customerPhone}</span>
-                          </div>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <PhoneActionButtons phone={o.customerPhone} showNumber size="xs" />
                         </td>
 
                         {/* Total Price */}
@@ -373,18 +368,12 @@ export function OrderManagementTab({ initialOrderId }: OrderManagementTabProps) 
 
                         <td className="py-3 px-3.5">
                           <p className="font-bold text-neutral-900">{ownerName}</p>
-                          <p className="text-[10px] font-mono text-neutral-600 flex items-center gap-1">
-                            <Phone className="h-3 w-3 text-neutral-400 shrink-0" />
-                            {ownerPhone}
-                          </p>
+                          <PhoneActionButtons phone={ownerPhone} showNumber size="xs" />
                         </td>
 
                         <td className="py-3 px-3.5">
                           <p className="font-bold text-neutral-900">{o.customerName}</p>
-                          <p className="text-[10px] font-mono text-emerald-800 font-semibold flex items-center gap-1">
-                            <Phone className="h-3 w-3 text-emerald-600 shrink-0" />
-                            {o.customerPhone}
-                          </p>
+                          <PhoneActionButtons phone={o.customerPhone} showNumber size="xs" />
                         </td>
 
                         <td className="py-3 px-3.5">
@@ -495,20 +484,14 @@ export function OrderManagementTab({ initialOrderId }: OrderManagementTabProps) 
                       <div className="rounded-xl border border-neutral-200/80 bg-purple-50/40 p-2.5 space-y-1 text-xs shadow-2xs">
                         <span className="text-[10px] uppercase tracking-wider font-bold text-purple-900 block">Business Owner</span>
                         <p className="font-bold text-neutral-900">{ownerName}</p>
-                        <p className="font-mono text-purple-950 font-semibold flex items-center gap-1.5 text-xs">
-                          <Phone className="h-3.5 w-3.5 text-purple-600 shrink-0" />
-                          <span>{ownerPhone}</span>
-                        </p>
+                        <PhoneActionButtons phone={ownerPhone} showNumber size="sm" />
                       </div>
 
                       {/* Customer Name & Phone Number */}
                       <div className="rounded-xl border border-neutral-200/80 bg-emerald-50/40 p-2.5 space-y-1 text-xs shadow-2xs">
                         <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-900 block">Customer Contact</span>
                         <p className="font-bold text-neutral-900">{o.customerName}</p>
-                        <p className="font-mono text-emerald-950 font-bold flex items-center gap-1.5 text-xs">
-                          <Phone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                          <span>{o.customerPhone}</span>
-                        </p>
+                        <PhoneActionButtons phone={o.customerPhone} showNumber size="sm" />
                       </div>
 
                       {/* Total Price & Commission */}

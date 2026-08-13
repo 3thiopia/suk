@@ -19,8 +19,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { StorefrontProduct, Product, StorefrontCustomization } from '../../types';
+import { storage } from '../../lib/storage';
 import { formatCurrency } from '../../lib/utils';
 import { ProductReviewsList } from '../common/ProductReviewsList';
+import { RatingStars } from '../common/RatingStars';
 import {
   getDefaultCustomization,
   getFontStyle,
@@ -429,11 +431,27 @@ export function CustomerProductDetailsModal({
                   )}
                 </div>
 
-                {/* 2. PRODUCT TITLE */}
+                {/* 2. PRODUCT TITLE & RATING */}
                 <div>
                   <h1 className="text-xl sm:text-2xl font-black leading-tight" style={{ color: colors.heading, ...fontHeadingStyle }}>
                     {product.title}
                   </h1>
+
+                  {/* Rating Summary */}
+                  {(() => {
+                    const stats = storage.getRatingStatsForProduct(product.id);
+                    return (
+                      <div className="flex items-center gap-2 mt-2">
+                        <RatingStars rating={stats.averageRating} size="sm" />
+                        <span className="text-xs font-bold" style={{ color: colors.heading }}>
+                          {stats.averageRating > 0 ? stats.averageRating.toFixed(1) : '5.0'}
+                        </span>
+                        <span className="text-xs font-medium opacity-60" style={{ color: colors.text }}>
+                          ({stats.totalReviews} {stats.totalReviews === 1 ? 'review' : 'reviews'})
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* 3. PRICE & QUANTITY SELECTOR */}

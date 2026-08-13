@@ -6,6 +6,7 @@ import { formatCurrency, formatDate } from '../../lib/utils';
 import { Modal } from '../common/Modal';
 import { ResponsiveDataTable, Column } from '../common/ResponsiveDataTable';
 import { ViewMode } from '../common/ViewToggle';
+import { PhoneActionButtons } from '../common/PhoneActionButtons';
 
 export function BusinessManagementTab() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,18 +63,29 @@ export function BusinessManagementTab() {
       key: 'brand',
       header: 'Brand / Owner',
       priority: 'primary',
-      cell: (b) => (
-        <div className="flex items-center gap-3">
-          <img src={b.logoUrl} alt={b.businessName} className="h-9 w-9 rounded-xl object-cover border shrink-0" />
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-neutral-900">{b.businessName}</span>
-              {b.isVerified && <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" title="Verified Brand" />}
+      cell: (b) => {
+        const ownerUser = storage.getUsers().find((u) => u.id === b.ownerId);
+        const ownerPhone = b.phone || ownerUser?.phone;
+
+        return (
+          <div className="flex items-center gap-3">
+            <img src={b.logoUrl} alt={b.businessName} className="h-9 w-9 rounded-xl object-cover border shrink-0" />
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-neutral-900">{b.businessName}</span>
+                {b.isVerified && <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" title="Verified Brand" />}
+              </div>
+              {ownerPhone ? (
+                <div className="mt-0.5">
+                  <PhoneActionButtons phone={ownerPhone} showNumber size="xs" />
+                </div>
+              ) : (
+                <p className="text-[10px] text-neutral-400">{b.website}</p>
+              )}
             </div>
-            <p className="text-[10px] text-neutral-400">{b.website}</p>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'category',

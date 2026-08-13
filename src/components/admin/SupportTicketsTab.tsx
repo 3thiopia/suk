@@ -34,6 +34,7 @@ import {
 } from '../../types';
 import { formatDate, formatCurrency } from '../../lib/utils';
 import { Modal } from '../common/Modal';
+import { PhoneActionButtons } from '../common/PhoneActionButtons';
 import { EmptyState } from '../common/EmptyState';
 
 const CUSTOMER_CATEGORIES: CustomerIssueCategory[] = [
@@ -429,12 +430,9 @@ export function SupportTicketsTab() {
                     <td className="py-3.5 px-4">
                       {ticket.ticketType === 'customer' ? (
                         <div>
-                          <p className="font-mono font-bold text-neutral-900 flex items-center gap-1">
-                            <Phone className="h-3 w-3 text-emerald-600" />
-                            {ticket.customerPhone}
-                          </p>
+                          <PhoneActionButtons phone={ticket.customerPhone || ''} showNumber size="xs" />
                           {ticket.customerName && (
-                            <p className="text-[10px] text-neutral-500">{ticket.customerName}</p>
+                            <p className="text-[10px] text-neutral-500 mt-0.5">{ticket.customerName}</p>
                           )}
                         </div>
                       ) : (
@@ -700,18 +698,8 @@ export function SupportTicketsTab() {
                 {selectedTicket.ticketType === 'customer' ? (
                   <div className="space-y-1.5">
                     <div>
-                      <span className="text-[10px] text-neutral-500">Customer Phone Number:</span>
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-black text-sm text-neutral-900">{selectedTicket.customerPhone}</span>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(selectedTicket.customerPhone || '', 'phone')}
-                          className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 text-[10px] font-bold text-neutral-700 hover:bg-neutral-100"
-                        >
-                          {copiedText === 'phone' ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
-                          <span>{copiedText === 'phone' ? 'Copied' : 'Copy'}</span>
-                        </button>
-                      </div>
+                      <span className="text-[10px] text-neutral-500 block mb-1">Customer Phone Number:</span>
+                      <PhoneActionButtons phone={selectedTicket.customerPhone || ''} showNumber size="sm" />
                     </div>
 
                     {selectedTicket.customerName && (

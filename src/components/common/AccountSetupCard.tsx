@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Circle, ArrowRight, Sparkles, ChevronRight, Building2, Store, User } from 'lucide-react';
 import { storage } from '../../lib/storage';
 import { UserRole } from '../../types';
@@ -8,6 +8,17 @@ interface AccountSetupCardProps {
 }
 
 export function AccountSetupCard({ onNavigate }: AccountSetupCardProps) {
+  const [, setUpdateTick] = useState(0);
+
+  useEffect(() => {
+    // Subscribe to real-time storage updates so that whenever profile, products, storefront,
+    // or supplier follow status changes, this component recalculates instantly without page refresh.
+    const unsubscribe = storage.subscribe(() => {
+      setUpdateTick((prev) => prev + 1);
+    });
+    return unsubscribe;
+  }, []);
+
   const currentUser = storage.getCurrentUser();
   if (!currentUser) return null;
 
@@ -30,14 +41,17 @@ export function AccountSetupCard({ onNavigate }: AccountSetupCardProps) {
     const business = storage.getBusinessByOwnerId(currentUser.id);
     const products = business ? storage.getProductsByBusinessId(business.id) : [];
 
-    const defaultLogoUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe';
-    const defaultBannerUrl = 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147';
-
     const isLogoUploaded = Boolean(business?.logoUrl && !business.logoUrl.includes('photo-1618005182384'));
     const isBannerUploaded = Boolean(business?.bannerUrl && !business.bannerUrl.includes('photo-1526738549149'));
-    const isDescriptionAdded = Boolean(business?.description && business.description.length > 20 && !business.description.includes('Official Verified Brand Supplier'));
+    const isDescriptionAdded = Boolean(
+      business?.description &&
+        business.description.trim().length > 20 &&
+        !business.description.includes('Official Verified Brand Supplier')
+    );
     const isProductAdded = products.length > 0;
-    const isStoreCustomized = Boolean(business?.website || (business?.category && business.category !== 'General'));
+    const isStoreCustomized = Boolean(
+      business?.website || (business?.category && business.category !== 'General') || business?.phone
+    );
 
     checklistItems = [
       {
@@ -101,8 +115,8 @@ export function AccountSetupCard({ onNavigate }: AccountSetupCardProps) {
     const isPhotoUploaded = Boolean(currentUser.avatarUrl && !currentUser.avatarUrl.includes('photo-1507003211169'));
     const isStoreCustomized = Boolean(
       storefront?.bannerTitle &&
-      !storefront.bannerTitle.startsWith('Welcome to') &&
-      storefront.themeColor
+        !storefront.bannerTitle.startsWith('Welcome to') &&
+        storefront.themeColor
     );
     const isProductAdded = storefrontProducts.length > 0;
     const isSupplierFollowed = following.length > 0;
@@ -160,6 +174,11 @@ export function AccountSetupCard({ onNavigate }: AccountSetupCardProps) {
   const percentage = Math.min(100, Math.round((completedWeight / totalWeight) * 100));
   const isAllComplete = percentage >= 100;
 
+  // Hide the reminder completely once account reaches 100% completion
+  if (isAllComplete) {
+    return null;
+  }
+
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-xs transition-all">
       {/* Card Header */}
@@ -174,16 +193,9 @@ export function AccountSetupCard({ onNavigate }: AccountSetupCardProps) {
           </p>
         </div>
 
-        {isAllComplete ? (
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-800 shrink-0">
-            <Sparkles className="h-4 w-4 text-emerald-600" />
-            <span>🎉 Setup Complete!</span>
-          </div>
-        ) : (
-          <div className="text-right">
-            <span className="text-xl font-black text-emerald-600">{percentage}%</span>
-          </div>
-        )}
+        <div className="text-right">
+          <span className="text-xl font-black text-emerald-600">{percentage}%</span>
+        </div>
       </div>
 
       {/* Progress Bar */}
@@ -194,56 +206,44 @@ export function AccountSetupCard({ onNavigate }: AccountSetupCardProps) {
         />
       </div>
 
-      {/* Completion Banner */}
-      {isAllComplete ? (
-        <div className="rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 text-center">
-          <p className="text-sm font-extrabold text-emerald-900">
-            🎉 Your account setup is complete!
-          </p>
-          <p className="mt-1 text-xs text-emerald-700">
-            You are ready to scale your business and generate maximum sales across the SUK marketplace network.
-          </p>
-        </div>
-      ) : (
-        /* Checklist Items Grid */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {checklistItems.map((item) => (
-            <div
-              key={item.id}
-              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                item.isCompleted
-                  ? 'bg-neutral-50/80 border-neutral-200 text-neutral-500'
-                  : 'bg-white border-neutral-200 hover:border-emerald-500 hover:shadow-2xs text-neutral-900'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                {item.isCompleted ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                ) : (
-                  <Circle className="h-4 w-4 text-neutral-300 shrink-0" />
-                )}
-                <span
-                  className={`text-xs font-medium truncate ${
-                    item.isCompleted ? 'line-through text-neutral-400' : 'text-neutral-800'
-                  }`}
-                >
-                  {item.label}
-                </span>
-              </div>
-
-              {!item.isCompleted && (
-                <button
-                  onClick={() => onNavigate(item.actionPath, item.actionParams)}
-                  className="ml-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline shrink-0"
-                >
-                  <span>{item.actionText}</span>
-                  <ChevronRight className="h-3 w-3" />
-                </button>
+      {/* Checklist Items Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {checklistItems.map((item) => (
+          <div
+            key={item.id}
+            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+              item.isCompleted
+                ? 'bg-neutral-50/80 border-neutral-200 text-neutral-500'
+                : 'bg-white border-neutral-200 hover:border-emerald-500 hover:shadow-2xs text-neutral-900'
+            }`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              {item.isCompleted ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              ) : (
+                <Circle className="h-4 w-4 text-neutral-300 shrink-0" />
               )}
+              <span
+                className={`text-xs font-medium truncate ${
+                  item.isCompleted ? 'line-through text-neutral-400' : 'text-neutral-800'
+                }`}
+              >
+                {item.label}
+              </span>
             </div>
-          ))}
-        </div>
-      )}
+
+            {!item.isCompleted && (
+              <button
+                onClick={() => onNavigate(item.actionPath, item.actionParams)}
+                className="ml-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline shrink-0"
+              >
+                <span>{item.actionText}</span>
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

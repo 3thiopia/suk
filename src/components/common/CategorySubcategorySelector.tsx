@@ -154,7 +154,7 @@ export function CategorySubcategorySelector({
 
       {/* Modal / Sheet for Category Selection */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-fadeIn">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-fadeIn">
           <div className="w-full sm:max-w-md max-h-[85vh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl border border-neutral-200 overflow-hidden">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-neutral-200 p-4">
@@ -226,7 +226,7 @@ export function CategorySubcategorySelector({
 
       {/* Modal / Sheet for Subcategory Selection */}
       {isSubcategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-fadeIn">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-fadeIn">
           <div className="w-full sm:max-w-md max-h-[85vh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl border border-neutral-200 overflow-hidden">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-neutral-200 p-4">

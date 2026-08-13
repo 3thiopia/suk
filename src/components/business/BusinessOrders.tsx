@@ -34,6 +34,7 @@ import { formatCurrency, formatDate } from '../../lib/utils';
 import { Modal } from '../common/Modal';
 import { EmptyState } from '../common/EmptyState';
 import { useTranslation } from '../../lib/i18n/LanguageContext';
+import { PhoneActionButtons } from '../common/PhoneActionButtons';
 
 type SortOption = 'date_desc' | 'date_asc' | 'total_desc' | 'total_asc' | 'customer_asc';
 type ViewMode = 'cards' | 'table';
@@ -447,14 +448,7 @@ export function BusinessOrders() {
                             <span>Customer: {order.customerName}</span>
                           </div>
                           <div className="flex items-center gap-1.5 text-neutral-800 font-mono text-xs">
-                            <Phone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                            <a
-                              href={`tel:${order.customerPhone}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="font-bold hover:underline hover:text-emerald-700"
-                            >
-                              {order.customerPhone}
-                            </a>
+                            <PhoneActionButtons phone={order.customerPhone} showNumber size="sm" />
                           </div>
                         </div>
 
@@ -588,10 +582,7 @@ export function BusinessOrders() {
 
                           {/* Customer Phone */}
                           <td className="py-3.5 px-4 whitespace-nowrap">
-                            <div className="flex items-center gap-1.5 font-mono text-neutral-700">
-                              <Phone className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
-                              <span>{order.customerPhone}</span>
-                            </div>
+                            <PhoneActionButtons phone={order.customerPhone} showNumber size="xs" />
                           </td>
 
                           {/* Quantity */}
@@ -776,11 +767,14 @@ export function BusinessOrders() {
             <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-500">Customer & Shipping Address</h4>
               <p className="text-sm font-bold text-neutral-900">{activeOrder.customerName}</p>
-              <p className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
+              <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap pt-1">
                 <span>Email: <strong className="text-neutral-900">{activeOrder.customerEmail}</strong></span>
                 <span>•</span>
-                <span>Phone: <a href={`tel:${activeOrder.customerPhone}`} className="text-neutral-900 font-mono font-bold hover:underline">{activeOrder.customerPhone}</a></span>
-              </p>
+                <span className="flex items-center gap-1">
+                  <span>Phone:</span>
+                  <PhoneActionButtons phone={activeOrder.customerPhone} showNumber size="sm" />
+                </span>
+              </div>
               <div className="mt-2 rounded-lg bg-neutral-50 p-3 text-xs text-neutral-800 leading-relaxed font-mono">
                 {activeOrder.shippingAddress.street}<br />
                 {activeOrder.shippingAddress.city}, {activeOrder.shippingAddress.state} {activeOrder.shippingAddress.zipCode}<br />

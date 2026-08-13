@@ -27,6 +27,7 @@ import { Product, ProductAppeal } from '../../types';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { Modal } from '../common/Modal';
 import { AppealStatusBadge } from '../common/Badge';
+import { PhoneActionButtons } from '../common/PhoneActionButtons';
 
 interface ProductModerationTabProps {
   onNavigateToAppeals?: () => void;
@@ -472,11 +473,9 @@ export function ProductModerationTab({
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-neutral-400 font-bold uppercase">Contact Info</p>
-                    <p className="font-mono text-emerald-700 text-[11px]">{ownerEmail}</p>
-                    <p className="font-mono text-neutral-600 text-[10px] flex items-center gap-1">
-                      <Phone className="h-3 w-3 shrink-0" /> {ownerPhone}
-                    </p>
+                    <p className="text-[10px] text-neutral-400 font-bold uppercase mb-0.5">Contact Info</p>
+                    <p className="font-mono text-emerald-700 text-[11px] mb-1">{ownerEmail}</p>
+                    <PhoneActionButtons phone={ownerPhone} showNumber size="xs" />
                   </div>
                 </div>
               </div>

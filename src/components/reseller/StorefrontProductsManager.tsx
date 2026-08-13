@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, Eye, EyeOff, MoveUp, MoveDown, Trash2, Image as ImageIcon, Check, FolderPlus, Lock, LayoutGrid, Table as TableIcon, Plus } from 'lucide-react';
+import { Layers, Eye, EyeOff, MoveUp, MoveDown, Trash2, Image as ImageIcon, Check, FolderPlus, Lock, LayoutGrid, Table as TableIcon, Plus, Star, MessageSquare } from 'lucide-react';
 import { storage } from '../../lib/storage';
 import { StorefrontProduct, Product } from '../../types';
 import { formatCurrency } from '../../lib/utils';
@@ -9,6 +9,8 @@ import { EmptyState } from '../common/EmptyState';
 import { SingleImageUploader } from '../common/SingleImageUploader';
 import { ResponsiveDataTable, Column } from '../common/ResponsiveDataTable';
 import { ViewToggle, ViewMode } from '../common/ViewToggle';
+import { RatingStars } from '../common/RatingStars';
+import { ProductReviewsModal } from '../common/ProductReviewsModal';
 
 interface StorefrontProductsManagerProps {
   onNavigate: (path: string) => void;
@@ -19,6 +21,7 @@ export function StorefrontProductsManager({ onNavigate }: StorefrontProductsMana
   const storefront = storage.getStorefrontByResellerId(currentUser.id);
 
   const [activeItem, setActiveItem] = useState<StorefrontProduct | null>(null);
+  const [reviewingProductId, setReviewingProductId] = useState<string | null>(null);
 
   // View Mode Switcher
   const [viewMode, setViewMode] = useState<'card' | 'table'>(() => {
@@ -56,7 +59,11 @@ export function StorefrontProductsManager({ onNavigate }: StorefrontProductsMana
   };
 
   const handleRemove = (sp: StorefrontProduct) => {
-    if (confirm(`Remove "${sp.product?.title}" from your storefront?`)) {
+    if (
+      confirm(
+        `Remove "${sp.product?.title}" from your storefront?\n\nNote: This unlists the product from your storefront only. It will NOT delete the owner's original product or modify its customer reviews.`
+      )
+    ) {
       storage.removeProductFromStorefront(storefront.id, sp.productId);
     }
   };
@@ -220,6 +227,21 @@ export function StorefrontProductsManager({ onNavigate }: StorefrontProductsMana
 
                     <h3 className="font-bold text-neutral-900 text-sm leading-snug line-clamp-2">{p.title}</h3>
 
+                    {/* Product Rating Summary */}
+                    {(() => {
+                      const stats = storage.getRatingStatsForProduct(p.id);
+                      return (
+                        <div
+                          onClick={() => setReviewingProductId(p.id)}
+                          className="flex items-center gap-1.5 text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                        >
+                          <RatingStars rating={stats.averageRating} size="xs" />
+                          <span className="font-bold text-neutral-900">{stats.averageRating.toFixed(1)}</span>
+                          <span className="text-neutral-400 text-[11px]">({stats.totalReviews})</span>
+                        </div>
+                      );
+                    })()}
+
                     <div className="flex items-baseline justify-between pt-1">
                       <span className="text-base font-extrabold text-neutral-900">{formatCurrency(p.price)}</span>
                       <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200">
@@ -255,6 +277,15 @@ export function StorefrontProductsManager({ onNavigate }: StorefrontProductsMana
                   </button>
 
                   <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setReviewingProductId(p.id)}
+                      className="rounded-xl border border-neutral-200 bg-white px-2 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-100 shadow-2xs flex items-center gap-1"
+                      title="View customer reviews for this product"
+                    >
+                      <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                      <span>Reviews</span>
+                    </button>
                     <button
                       onClick={() => setActiveItem(sp)}
                       className="rounded-xl border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-100 shadow-2xs"
@@ -489,6 +520,21 @@ export function StorefrontProductsManager({ onNavigate }: StorefrontProductsMana
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Product Reviews Modal */}
+      {reviewingProductId && (
+        <ProductReviewsModal
+          isOpen={!!reviewingProductId}
+          onClose={() => setReviewingProductId(null)}
+          productId={reviewingProductId}
+          isCreator={true}
+          storefrontId={storefront.id}
+          onRemoveFromStorefront={() => {
+            storage.removeProductFromStorefront(storefront.id, reviewingProductId);
+            setReviewingProductId(null);
+          }}
+        />
       )}
     </div>
   );

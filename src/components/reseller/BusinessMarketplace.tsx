@@ -26,8 +26,10 @@ import {
   UserCheck,
   Users,
   Coins,
+  Star,
 } from 'lucide-react';
 import { storage } from '../../lib/storage';
+import { RatingStars } from '../common/RatingStars';
 import { Product, BusinessProfile, StorefrontProduct, Collection } from '../../types';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { getProductCommission } from '../../lib/commission';
@@ -160,6 +162,11 @@ export function BusinessMarketplace({ onNavigate }: BusinessMarketplaceProps) {
       }
       if (sortBy === 'price_desc') {
         return b.price - a.price;
+      }
+      if (sortBy === 'highest_rated') {
+        const statsA = storage.getRatingStatsForProduct(a.id);
+        const statsB = storage.getRatingStatsForProduct(b.id);
+        return statsB.averageRating - statsA.averageRating;
       }
       return 0;
     });
@@ -519,6 +526,7 @@ export function BusinessMarketplace({ onNavigate }: BusinessMarketplaceProps) {
                 className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-xs font-bold text-neutral-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-neutral-900"
               >
                 <option value="newest">Sort: Newest Added</option>
+                <option value="highest_rated">Sort: Highest Customer Rating</option>
                 <option value="popular">Sort: High Stock / Popular</option>
                 <option value="price_asc">Sort: Price Low to High</option>
                 <option value="price_desc">Sort: Price High to Low</option>
@@ -718,12 +726,29 @@ export function BusinessMarketplace({ onNavigate }: BusinessMarketplaceProps) {
 
                               <div
                                 onClick={() => onNavigate(`/product/${product.id}`)}
-                                className="cursor-pointer"
+                                className="cursor-pointer space-y-1"
                               >
                                 <h3 className="font-bold text-neutral-900 text-sm line-clamp-1 group-hover:text-emerald-600 transition-colors">
                                   {product.title}
                                 </h3>
-                                <p className="text-xs text-neutral-500 line-clamp-2 mt-1 leading-relaxed">
+
+                                {/* Star Rating Summary */}
+                                {(() => {
+                                  const stats = storage.getRatingStatsForProduct(product.id);
+                                  return (
+                                    <div className="flex items-center gap-1.5 text-xs text-neutral-600">
+                                      <RatingStars rating={stats.averageRating} size="xs" />
+                                      <span className="font-bold text-neutral-900">
+                                        {stats.averageRating > 0 ? stats.averageRating.toFixed(1) : '5.0'}
+                                      </span>
+                                      <span className="text-[11px] text-neutral-400">
+                                        ({stats.totalReviews})
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
+
+                                <p className="text-xs text-neutral-500 line-clamp-2 leading-relaxed">
                                   {product.description}
                                 </p>
                               </div>

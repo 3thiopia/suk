@@ -36,6 +36,7 @@ import {
   ChevronRight,
   TrendingUp,
   RotateCcw,
+  Star,
 } from 'lucide-react';
 import { storage } from '../../lib/storage';
 import { Product, ProductStatus } from '../../types';
@@ -46,6 +47,8 @@ import { EmptyState } from '../common/EmptyState';
 import { ProductAppealModal } from './ProductAppealModal';
 import { MultiImageUploader } from '../common/MultiImageUploader';
 import { useTranslation } from '../../lib/i18n/LanguageContext';
+import { RatingStars } from '../common/RatingStars';
+import { ProductReviewsModal } from '../common/ProductReviewsModal';
 
 const SAMPLE_PRODUCT_IMAGES = [
   'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80',
@@ -95,6 +98,7 @@ export function ProductManager() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
+  const [reviewingProductId, setReviewingProductId] = useState<string | null>(null);
   const [appealModalProduct, setAppealModalProduct] = useState<Product | null>(null);
   const [activeInspectorImage, setActiveInspectorImage] = useState<string>('');
 
@@ -700,6 +704,18 @@ export function ProductManager() {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  setReviewingProductId(p.id);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-amber-50 hover:text-amber-900 text-neutral-800 cursor-pointer transition-colors"
+                              >
+                                <Star className="h-4 w-4 text-amber-500 shrink-0 fill-amber-500" />
+                                <span>Customer Reviews</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   handleOpenEditModal(p);
                                   setOpenDropdownId(null);
                                 }}
@@ -790,17 +806,34 @@ export function ProductManager() {
                       {p.title}
                     </h3>
 
+                    {/* Star Rating Summary */}
+                    {(() => {
+                      const stats = storage.getRatingStatsForProduct(p.id);
+                      return (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReviewingProductId(p.id);
+                          }}
+                          className="flex items-center gap-1.5 text-xs text-neutral-600 cursor-pointer hover:opacity-80"
+                        >
+                          <RatingStars rating={stats.averageRating} size="xs" />
+                          <span className="font-bold text-neutral-900">
+                            {stats.averageRating > 0 ? stats.averageRating.toFixed(1) : '5.0'}
+                          </span>
+                          <span className="text-[11px] text-neutral-400">
+                            ({stats.totalReviews})
+                          </span>
+                        </div>
+                      );
+                    })()}
+
                     {/* Price & Stock Row */}
                     <div className="flex items-baseline justify-between pt-1">
                       <div>
                         <span className="text-base font-extrabold text-neutral-900">
                           {formatCurrency(p.price)}
                         </span>
-                        {p.costPrice ? (
-                          <span className="ml-1.5 text-[11px] text-neutral-400 font-normal">
-                            Cost: {formatCurrency(p.costPrice)}
-                          </span>
-                        ) : null}
                       </div>
 
                       <span
@@ -1297,21 +1330,23 @@ export function ProductManager() {
           setSubcategoryError(null);
         }}
         title={editingProduct ? 'Edit Brand Product' : 'Add New Brand Product'}
+        mobileTitle={editingProduct ? 'Edit Product' : 'Add Product'}
         subtitle="Business Owner control. Updates automatically sync across all reseller storefronts."
         maxWidth="2xl"
+        fullScreenMobile={true}
       >
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 flex flex-col h-full sm:h-auto">
           <div ref={formTopRef} />
 
           {/* Top Validation Error Banner */}
           {validationError && (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-2xs flex items-start gap-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3.5 sm:p-4 shadow-2xs flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="rounded-xl bg-rose-100 p-2 text-rose-600 shrink-0 mt-0.5">
-                <AlertCircle className="h-5 w-5" />
+                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-xs font-extrabold uppercase tracking-wider text-rose-900">Validation Error</h4>
-                <p className="mt-0.5 text-xs sm:text-sm font-bold text-rose-800">{validationError}</p>
+                <h4 className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-rose-900">Validation Error</h4>
+                <p className="mt-0.5 text-xs sm:text-sm font-bold text-rose-800 leading-snug">{validationError}</p>
               </div>
             </div>
           )}
@@ -1569,24 +1604,34 @@ export function ProductManager() {
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="sticky bottom-0 bg-white pt-3 pb-1 border-t border-neutral-200 flex items-center justify-end gap-2.5">
+          {/* Action Buttons Footer */}
+          <div className="sticky bottom-0 bg-white/98 backdrop-blur-md pt-3 pb-3 sm:pb-1 -mx-4 -mb-4 px-4 sm:mx-0 sm:mb-0 border-t border-neutral-200/90 flex items-center justify-end gap-2.5 z-20 shadow-lg sm:shadow-none mt-2">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white min-h-[44px] px-5 py-2.5 text-xs sm:text-sm font-bold text-neutral-700 hover:bg-neutral-50 active:scale-95 transition-all"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white min-h-[46px] sm:min-h-[42px] px-5 py-2.5 text-xs sm:text-sm font-bold text-neutral-700 hover:bg-neutral-50 active:scale-95 transition-all cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center rounded-xl bg-neutral-900 min-h-[44px] px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-neutral-800 active:scale-95 transition-all"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center rounded-xl bg-neutral-900 min-h-[46px] sm:min-h-[42px] px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-neutral-800 active:scale-95 transition-all cursor-pointer"
             >
-              {editingProduct ? 'Save & Sync to Resellers' : 'Create Product'}
+              {editingProduct ? 'Save & Sync to Resellers' : 'Add Product'}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Product Reviews Modal */}
+      {reviewingProductId && (
+        <ProductReviewsModal
+          isOpen={!!reviewingProductId}
+          onClose={() => setReviewingProductId(null)}
+          productId={reviewingProductId}
+          isCreator={false}
+        />
+      )}
     </div>
   );
 }

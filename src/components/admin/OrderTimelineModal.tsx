@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal } from '../common/Modal';
+import { PhoneActionButtons } from '../common/PhoneActionButtons';
 import { Order, OrderTimelineEvent } from '../../types';
 import { storage } from '../../lib/storage';
 import { formatCurrency, formatDate } from '../../lib/utils';
@@ -25,7 +26,11 @@ export function OrderTimelineModal({ order, onClose }: OrderTimelineModalProps) 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-xs font-bold text-neutral-900">Buyer: {order.customerName}</p>
-              <p className="text-[11px] text-neutral-500">{order.customerEmail} • {order.customerPhone}</p>
+              <div className="text-[11px] text-neutral-500 flex items-center gap-1.5 flex-wrap mt-0.5">
+                <span>{order.customerEmail}</span>
+                <span>•</span>
+                <PhoneActionButtons phone={order.customerPhone} showNumber size="xs" />
+              </div>
             </div>
             <div className="text-right">
               <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold uppercase text-emerald-800">

@@ -27,6 +27,8 @@ import { useFollow } from '../../hooks/useFollow';
 import { UnfollowConfirmModal } from '../common/UnfollowConfirmModal';
 import { EmptyState } from '../common/EmptyState';
 import { useTranslation } from '../../lib/i18n/LanguageContext';
+import { ProductReviewsList } from '../common/ProductReviewsList';
+import { RatingStars } from '../common/RatingStars';
 
 interface ProductDetailPageProps {
   productId?: string;
@@ -275,10 +277,26 @@ export function ProductDetailPage({ productId, onNavigate, onBack }: ProductDeta
                 <span className="text-neutral-400 font-medium">SKU: #{product.id.slice(-6).toUpperCase()}</span>
               </div>
 
-              {/* Title */}
-              <h1 className="text-2xl font-black tracking-tight text-neutral-900 leading-tight">
-                {product.title}
-              </h1>
+              {/* Title & Rating */}
+              <div>
+                <h1 className="text-2xl font-black tracking-tight text-neutral-900 leading-tight">
+                  {product.title}
+                </h1>
+                {(() => {
+                  const stats = storage.getRatingStatsForProduct(product.id);
+                  return (
+                    <div className="flex items-center gap-2 mt-2">
+                      <RatingStars rating={stats.averageRating} size="sm" />
+                      <span className="text-xs font-bold text-neutral-900">
+                        {stats.averageRating > 0 ? stats.averageRating.toFixed(1) : '5.0'}
+                      </span>
+                      <span className="text-xs text-neutral-500 font-medium">
+                        ({stats.totalReviews} customer {stats.totalReviews === 1 ? 'review' : 'reviews'})
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
 
               {/* Description */}
               <p className="text-xs text-neutral-600 leading-relaxed">
@@ -429,6 +447,26 @@ export function ProductDetailPage({ productId, onNavigate, onBack }: ProductDeta
           </div>
         </div>
       )}
+
+      {/* PRODUCT REVIEWS & FEEDBACK */}
+      <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <ProductReviewsList
+          productId={product.id}
+          businessId={product.businessId}
+          isCreator={true}
+          storefrontId={storefront?.id}
+          onRemoveFromStorefront={
+            isAddedToStore
+              ? () => {
+                  if (storefront) {
+                    storage.removeProductFromStorefront(storefront.id, product.id);
+                    showToast('Product removed from your storefront');
+                  }
+                }
+              : undefined
+          }
+        />
+      </div>
 
       {/* RELATED PRODUCTS FROM SAME SUPPLIER */}
       {relatedProducts.length > 0 && business && (

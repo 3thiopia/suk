@@ -5,6 +5,7 @@ import { AccountAppeal, ProductAppeal } from '../../types';
 import { formatDate, formatCurrency } from '../../lib/utils';
 import { Modal } from '../common/Modal';
 import { AppealStatusBadge } from '../common/Badge';
+import { PhoneActionButtons } from '../common/PhoneActionButtons';
 
 interface AppealsTabProps {
   defaultTab?: 'account' | 'product';
@@ -287,10 +288,8 @@ export function AppealsTab({ defaultTab = 'product', onNavigateToProductModerati
                       <td className="py-3.5 px-4">
                         <div>
                           <p className="font-bold text-neutral-900">{apl.ownerName}</p>
-                          <p className="text-[11px] text-neutral-500">{apl.businessName}</p>
-                          <p className="text-[10px] text-emerald-700 font-mono font-medium flex items-center gap-1 mt-0.5">
-                            <Phone className="h-3 w-3 shrink-0" /> {phone}
-                          </p>
+                          <p className="text-[11px] text-neutral-500 mb-0.5">{apl.businessName}</p>
+                          <PhoneActionButtons phone={phone} showNumber size="xs" />
                         </div>
                       </td>
 
@@ -518,8 +517,8 @@ export function AppealsTab({ defaultTab = 'product', onNavigateToProductModerati
                     <span className="font-bold text-neutral-900">{selectedProductAppeal.ownerName}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-neutral-400 block font-semibold">Phone Number</span>
-                    <span className="font-mono font-bold text-neutral-800">{ownerPhone}</span>
+                    <span className="text-[10px] text-neutral-400 block font-semibold mb-0.5">Phone Number</span>
+                    <PhoneActionButtons phone={ownerPhone} showNumber size="sm" />
                   </div>
                   <div>
                     <span className="text-[10px] text-neutral-400 block font-semibold">Business Name</span>

@@ -41,6 +41,7 @@ import { EmptyState } from '../common/EmptyState';
 import { useTranslation } from '../../lib/i18n/LanguageContext';
 import { useFollow } from '../../hooks/useFollow';
 import { UnfollowConfirmModal } from '../common/UnfollowConfirmModal';
+import { PhoneActionButtons } from '../common/PhoneActionButtons';
 
 interface SupplierProfilePageProps {
   businessId?: string;
@@ -1031,13 +1032,8 @@ export function SupplierProfilePage({ businessId, onNavigate, onBack }: Supplier
                 <div className="flex items-center gap-3 rounded-2xl border border-neutral-100 bg-neutral-50 p-3.5">
                   <Phone className="h-4 w-4 text-emerald-600 shrink-0" />
                   <div>
-                    <p className="font-semibold text-neutral-500 text-[10px]">BUSINESS PHONE</p>
-                    <a
-                      href={`tel:${business.phone}`}
-                      className="font-bold text-neutral-900 hover:text-emerald-700"
-                    >
-                      {business.phone}
-                    </a>
+                    <p className="font-semibold text-neutral-500 text-[10px] mb-0.5">BUSINESS PHONE</p>
+                    <PhoneActionButtons phone={business.phone} showNumber size="sm" />
                   </div>
                 </div>
               )}

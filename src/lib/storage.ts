@@ -2907,6 +2907,22 @@ class MarketplaceStorageService {
     };
   }
 
+  public getVerifiedOrdersForProduct(productId: string, customerEmailOrId?: string): Order[] {
+    const orders = this.getOrders();
+    return orders.filter((o) => {
+      if (o.status === 'cancelled' || o.status === 'rejected') return false;
+      const hasItem = o.items.some((item) => item.productId === productId);
+      if (!hasItem) return false;
+      if (customerEmailOrId && customerEmailOrId.trim()) {
+        const query = customerEmailOrId.trim().toLowerCase();
+        const matchesEmail = o.customerEmail.toLowerCase().includes(query);
+        const matchesId = o.id.toLowerCase().includes(query);
+        if (!matchesEmail && !matchesId) return false;
+      }
+      return true;
+    });
+  }
+
   public createReview(data: {
     orderId: string;
     productId: string;
@@ -2918,10 +2934,17 @@ class MarketplaceStorageService {
     comment?: string;
   }): ProductReview {
     const orders = this.getOrders();
-    const order = orders.find((o) => o.id === data.orderId);
+    const order = orders.find(
+      (o) => o.id === data.orderId || o.id.toLowerCase() === data.orderId.toLowerCase()
+    );
 
-    // Verify purchase
-    const isVerifiedPurchase = !!order && (order.status === 'delivered' || order.status === 'completed');
+    // Verify purchase: Order must exist and contain the target product, and not be cancelled/rejected
+    const orderItem = order?.items.find((i) => i.productId === data.productId);
+    const isVerifiedPurchase = !!order && !!orderItem && order.status !== 'cancelled' && order.status !== 'rejected';
+
+    if (!isVerifiedPurchase) {
+      throw new Error('Only customers who actually purchased this product can leave a review. No verified order was found.');
+    }
 
     const products = this.getProducts();
     const product = products.find((p) => p.id === data.productId);
@@ -2943,12 +2966,12 @@ class MarketplaceStorageService {
       orderId: data.orderId,
       productId: data.productId,
       businessId: data.businessId,
-      storefrontId: data.storefrontId,
+      storefrontId: data.storefrontId || order.storefrontId,
       customerName: data.isAnonymous ? 'Anonymous Customer' : data.customerName,
       isAnonymous: !!data.isAnonymous,
       rating: Math.min(5, Math.max(1, Math.round(data.rating))),
       comment: data.comment?.trim() || undefined,
-      isVerifiedPurchase,
+      isVerifiedPurchase: true,
       isHidden: false,
       createdAt: now,
       updatedAt: now,
@@ -2996,6 +3019,35 @@ class MarketplaceStorageService {
     }
 
     return newReview;
+  }
+
+  public updateReview(data: {
+    reviewId: string;
+    rating: number;
+    comment?: string;
+    isAnonymous?: boolean;
+    customerName?: string;
+  }): ProductReview {
+    const reviews = this.getReviews();
+    const index = reviews.findIndex((r) => r.id === data.reviewId);
+    if (index === -1) throw new Error('Review not found');
+
+    const current = reviews[index];
+    const updatedReview: ProductReview = {
+      ...current,
+      rating: Math.min(5, Math.max(1, Math.round(data.rating))),
+      comment: data.comment?.trim() || undefined,
+      customerName: data.isAnonymous
+        ? 'Anonymous Customer'
+        : (data.customerName || current.customerName),
+      isAnonymous: typeof data.isAnonymous === 'boolean' ? data.isAnonymous : current.isAnonymous,
+      updatedAt: new Date().toISOString(),
+    };
+
+    reviews[index] = updatedReview;
+    this.setItem(STORAGE_KEYS.REVIEWS, reviews);
+    this.recalculateBusinessRating(current.businessId);
+    return updatedReview;
   }
 
   public replyToReview(reviewId: string, replyText: string, authorName: string): ProductReview | undefined {
