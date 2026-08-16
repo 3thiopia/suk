@@ -20,6 +20,8 @@ export type NotificationType =
   | 'commission_earned'
   | 'monthly_payout'
   | 'payout_processed'
+  | 'payout_recorded'
+  | 'commission_payout_paid'
   | 'product_updated'
   | 'business_updated'
   | 'storefront_updated'
@@ -429,6 +431,64 @@ export interface CommissionPayout {
   periodStart: string;
   periodEnd: string;
   createdAt: string;
+}
+
+export type CreatorPayoutStatus = 'not_eligible' | 'eligible' | 'paid';
+
+export type PayoutPaymentMethod = 'telebirr' | 'bank_transfer' | 'cbe_birr' | 'cash' | 'other' | string;
+
+export interface CreatorPayout {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  creatorEmail?: string;
+  creatorPhone?: string;
+  storefrontId: string;
+  storefrontName: string;
+  amount: number;
+  currency: string;
+  status: 'paid';
+  paymentMethod: PayoutPaymentMethod;
+  transactionReference?: string;
+  paidAt: string;
+  paidByAdminId: string;
+  paidByAdminName: string;
+  note?: string;
+  commissionPeriod?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatorCommissionBalance {
+  creatorId: string;
+  creatorName: string;
+  creatorEmail: string;
+  creatorPhone?: string;
+  avatarUrl?: string;
+  storefrontId: string;
+  storefrontName: string;
+  storefrontSlug?: string;
+  logoUrl?: string;
+  totalCommissionEarned: number;
+  alreadyPaid: number;
+  unpaidCommission: number;
+  minPayoutAmount: number;
+  status: CreatorPayoutStatus;
+  eligibleOrdersCount: number;
+  payoutsCount: number;
+  lastPayoutDate?: string;
+  lastPayoutMethod?: string;
+  lastPayoutReference?: string;
+}
+
+export interface PayoutSummaryStats {
+  eligibleCreatorsCount: number;
+  totalUnpaidCommissions: number;
+  paidThisPeriod: number;
+  totalPaidAmount: number;
+  notEligibleCreatorsCount: number;
+  totalCreatorsCount: number;
+  minPayoutAmount: number;
 }
 
 export type DisputeStatus = 'open' | 'investigating' | 'resolved' | 'rejected';

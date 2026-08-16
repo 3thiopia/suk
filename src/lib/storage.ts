@@ -13,6 +13,11 @@ import {
   Collection,
   Order,
   CommissionPayout,
+  CreatorPayout,
+  CreatorCommissionBalance,
+  PayoutSummaryStats,
+  CreatorPayoutStatus,
+  PayoutPaymentMethod,
   Notification,
   Follower,
   Category,
@@ -58,6 +63,7 @@ import {
   initialFollowers,
   initialNotifications,
   initialPayouts,
+  initialCreatorPayouts,
   initialCategories,
   initialDisputes,
   initialReports,
@@ -88,6 +94,8 @@ const STORAGE_KEYS = {
   STOREFRONT_PRODUCTS: 'wl_storefront_products',
   ORDERS: 'wl_orders',
   PAYOUTS: 'wl_payouts',
+  CREATOR_PAYOUTS: 'wl_creator_payouts',
+  CREATOR_MIN_PAYOUT: 'wl_creator_min_payout',
   NOTIFICATIONS: 'wl_notifications',
   FOLLOWERS: 'wl_followers',
   CATEGORIES: 'wl_categories',
@@ -212,6 +220,8 @@ class MarketplaceStorageService {
       localStorage.setItem(STORAGE_KEYS.FOLLOWERS, JSON.stringify(initialFollowers));
       localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(initialNotifications));
       localStorage.setItem(STORAGE_KEYS.PAYOUTS, JSON.stringify(initialPayouts));
+      localStorage.setItem(STORAGE_KEYS.CREATOR_PAYOUTS, JSON.stringify(initialCreatorPayouts));
+      localStorage.setItem(STORAGE_KEYS.CREATOR_MIN_PAYOUT, JSON.stringify(1000));
       localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(initialCategories));
       localStorage.setItem(STORAGE_KEYS.DISPUTES, JSON.stringify(initialDisputes));
       localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(initialReports));
@@ -243,6 +253,28 @@ class MarketplaceStorageService {
       }
       if (!localStorage.getItem(STORAGE_KEYS.REVIEW_REPORTS)) {
         localStorage.setItem(STORAGE_KEYS.REVIEW_REPORTS, JSON.stringify(initialReviewReports));
+      }
+      if (!localStorage.getItem(STORAGE_KEYS.CREATOR_PAYOUTS)) {
+        localStorage.setItem(STORAGE_KEYS.CREATOR_PAYOUTS, JSON.stringify(initialCreatorPayouts));
+      }
+      if (!localStorage.getItem(STORAGE_KEYS.CREATOR_MIN_PAYOUT)) {
+        localStorage.setItem(STORAGE_KEYS.CREATOR_MIN_PAYOUT, JSON.stringify(1000));
+      }
+      // Ensure Ethiopian creator users and storefronts exist in local storage if not already added
+      try {
+        const storedUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]') as User[];
+        const missingUsers = initialUsers.filter((iu) => !storedUsers.some((su) => su.id === iu.id));
+        if (missingUsers.length > 0) {
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([...storedUsers, ...missingUsers]));
+        }
+
+        const storedStorefronts = JSON.parse(localStorage.getItem(STORAGE_KEYS.STOREFRONTS) || '[]') as Storefront[];
+        const missingStorefronts = initialStorefronts.filter((is) => !storedStorefronts.some((ss) => ss.id === is.id));
+        if (missingStorefronts.length > 0) {
+          localStorage.setItem(STORAGE_KEYS.STOREFRONTS, JSON.stringify([...storedStorefronts, ...missingStorefronts]));
+        }
+      } catch (e) {
+        console.error('Failed to sync initial creators', e);
       }
     }
   }
@@ -1111,6 +1143,287 @@ class MarketplaceStorageService {
     this.setItem(STORAGE_KEYS.STOREFRONTS, updatedStorefronts);
     this.setItem(STORAGE_KEYS.PAYOUTS, payouts);
     return generatedCount;
+  }
+
+  // --- MANUAL CREATOR COMMISSION PAYOUT SYSTEM ---
+  public getMinPayoutAmount(): number {
+    const raw = this.getItem<number | null>(STORAGE_KEYS.CREATOR_MIN_PAYOUT, null);
+    if (raw !== null && typeof raw === 'number' && raw >= 0) {
+      return raw;
+    }
+    const settings = this.getPlatformSettings();
+    return settings.minPayoutAmount || 1000;
+  }
+
+  public setMinPayoutAmount(amount: number): void {
+    const cleanAmount = Math.max(0, Number(amount) || 1000);
+    this.setItem(STORAGE_KEYS.CREATOR_MIN_PAYOUT, cleanAmount);
+    this.updatePlatformSettings({ minPayoutAmount: cleanAmount });
+    this.logAdminAction(
+      'UPDATE_MIN_PAYOUT',
+      'platform_settings',
+      'min_payout',
+      `Admin updated platform minimum payout amount to ${cleanAmount.toLocaleString()} ETB.`
+    );
+    this.notify();
+  }
+
+  public getCreatorPayouts(): CreatorPayout[] {
+    const payouts = this.getItem<CreatorPayout[]>(STORAGE_KEYS.CREATOR_PAYOUTS, initialCreatorPayouts);
+    return [...payouts].sort(
+      (a, b) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime()
+    );
+  }
+
+  public getCreatorPayoutsByCreatorId(creatorId: string): CreatorPayout[] {
+    return this.getCreatorPayouts().filter((p) => p.creatorId === creatorId || p.storefrontId === creatorId);
+  }
+
+  public getCreatorCommissionBalances(minPayoutOverride?: number): CreatorCommissionBalance[] {
+    const users = this.getUsers().filter((u) => u.role === 'reseller' || (u.role as string) === 'creator');
+    const storefronts = this.getStorefronts();
+    const allOrders = this.getOrders();
+    const allPayouts = this.getCreatorPayouts();
+    const platformMinPayout =
+      minPayoutOverride !== undefined && minPayoutOverride >= 0
+        ? minPayoutOverride
+        : this.getMinPayoutAmount();
+
+    return users.map((user) => {
+      const storefront =
+        storefronts.find((s) => s.resellerId === user.id) ||
+        this.getStorefrontByResellerId(user.id);
+
+      // Orders that contribute to commission (delivered, completed, or explicitly marked eligible)
+      const creatorOrders = allOrders.filter((o) => {
+        const isStore =
+          o.storefrontId === storefront?.id ||
+          o.storefrontId === `sf_${user.id}` ||
+          o.storefrontId === user.id;
+        return isStore;
+      });
+
+      const eligibleOrders = creatorOrders.filter(
+        (o) => o.status === 'delivered' || o.status === 'completed' || o.commissionEligibleForPayout
+      );
+
+      const ordersTotalCommission = eligibleOrders.reduce(
+        (sum, o) => sum + (Number(o.resellerCommission) || 0),
+        0
+      );
+
+      // Total commission earned: use the higher of order sums or seeded storefront totalEarnings
+      const totalCommissionEarned = Math.max(
+        ordersTotalCommission,
+        storefront?.totalEarnings || 0
+      );
+
+      // Creator's recorded manual payouts
+      const creatorPayouts = allPayouts.filter(
+        (p) => p.creatorId === user.id || (storefront && p.storefrontId === storefront.id)
+      );
+
+      const alreadyPaid = creatorPayouts.reduce(
+        (sum, p) => sum + (Number(p.amount) || 0),
+        0
+      );
+
+      const unpaidCommission = Math.max(0, totalCommissionEarned - alreadyPaid);
+      const minPayout = platformMinPayout;
+
+      let status: CreatorPayoutStatus = 'not_eligible';
+      if (unpaidCommission >= minPayout && unpaidCommission > 0) {
+        status = 'eligible';
+      } else if (unpaidCommission === 0 && alreadyPaid > 0) {
+        status = 'paid';
+      } else {
+        status = 'not_eligible';
+      }
+
+      const lastPayout = creatorPayouts[0];
+
+      const cleanCreatorName = user.name.includes('(')
+        ? user.name.split('(')[0].trim()
+        : user.name;
+
+      return {
+        creatorId: user.id,
+        creatorName: cleanCreatorName,
+        creatorEmail: user.email,
+        creatorPhone: user.phone || '+251 91 123 4567',
+        avatarUrl: user.avatarUrl,
+        storefrontId: storefront?.id || `sf_${user.id}`,
+        storefrontName: storefront?.storeName || `${cleanCreatorName}'s Store`,
+        storefrontSlug: storefront?.slug,
+        logoUrl: storefront?.logoUrl,
+        totalCommissionEarned,
+        alreadyPaid,
+        unpaidCommission,
+        minPayoutAmount: minPayout,
+        status,
+        eligibleOrdersCount: eligibleOrders.length,
+        payoutsCount: creatorPayouts.length,
+        lastPayoutDate: lastPayout?.paidAt,
+        lastPayoutMethod: lastPayout?.paymentMethod,
+        lastPayoutReference: lastPayout?.transactionReference,
+      };
+    });
+  }
+
+  public getCreatorCommissionBalanceById(creatorId: string): CreatorCommissionBalance | null {
+    const balances = this.getCreatorCommissionBalances();
+    return (
+      balances.find(
+        (b) => b.creatorId === creatorId || b.storefrontId === creatorId
+      ) || null
+    );
+  }
+
+  public getPayoutSummaryStats(minPayoutOverride?: number): PayoutSummaryStats {
+    const balances = this.getCreatorCommissionBalances(minPayoutOverride);
+    const payouts = this.getCreatorPayouts();
+    const minPayoutAmount =
+      minPayoutOverride !== undefined && minPayoutOverride >= 0
+        ? minPayoutOverride
+        : this.getMinPayoutAmount();
+
+    const eligibleCreatorsCount = balances.filter((b) => b.status === 'eligible').length;
+    const notEligibleCreatorsCount = balances.filter((b) => b.status === 'not_eligible').length;
+    const totalUnpaidCommissions = balances.reduce((sum, b) => sum + b.unpaidCommission, 0);
+    const totalPaidAmount = payouts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const paidThisPeriod = payouts
+      .filter((p) => p.paidAt >= thirtyDaysAgo)
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    return {
+      eligibleCreatorsCount,
+      totalUnpaidCommissions,
+      paidThisPeriod: paidThisPeriod || totalPaidAmount,
+      totalPaidAmount,
+      notEligibleCreatorsCount,
+      totalCreatorsCount: balances.length,
+      minPayoutAmount,
+    };
+  }
+
+  public recordCreatorManualPayment(params: {
+    creatorId: string;
+    amount: number;
+    paymentMethod: string;
+    transactionReference?: string;
+    note?: string;
+    commissionPeriod?: string;
+    paidByAdminId?: string;
+    paidByAdminName?: string;
+  }): CreatorPayout {
+    const currentUser = this.getCurrentUser();
+    const adminId = params.paidByAdminId || currentUser?.id || 'usr_admin';
+    const adminName =
+      params.paidByAdminName ||
+      (currentUser?.role === 'admin' ? currentUser.name : 'System Admin');
+
+    const balance = this.getCreatorCommissionBalanceById(params.creatorId);
+    if (!balance) {
+      throw new Error(`Creator with ID "${params.creatorId}" not found.`);
+    }
+
+    const payAmount = Number(params.amount);
+    if (isNaN(payAmount) || payAmount <= 0) {
+      throw new Error('Payment amount must be greater than 0 ETB.');
+    }
+
+    if (payAmount > balance.unpaidCommission) {
+      throw new Error(
+        `Payment amount (${payAmount.toLocaleString()} ETB) exceeds available unpaid commission (${balance.unpaidCommission.toLocaleString()} ETB). Double payments and overpayments are strictly prevented.`
+      );
+    }
+
+    const now = new Date().toISOString();
+    const newPayout: CreatorPayout = {
+      id: generateId('pay_cr'),
+      creatorId: balance.creatorId,
+      creatorName: balance.creatorName,
+      creatorEmail: balance.creatorEmail,
+      creatorPhone: balance.creatorPhone,
+      storefrontId: balance.storefrontId,
+      storefrontName: balance.storefrontName,
+      amount: payAmount,
+      currency: 'ETB',
+      status: 'paid',
+      paymentMethod: (params.paymentMethod as PayoutPaymentMethod) || 'telebirr',
+      transactionReference: params.transactionReference?.trim() || undefined,
+      paidAt: now,
+      paidByAdminId: adminId,
+      paidByAdminName: adminName,
+      note: params.note?.trim() || undefined,
+      commissionPeriod:
+        params.commissionPeriod?.trim() ||
+        `Period ending ${new Date().toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // 1. Persist new Creator Payout record
+    const existingPayouts = this.getCreatorPayouts();
+    this.setItem(STORAGE_KEYS.CREATOR_PAYOUTS, [newPayout, ...existingPayouts]);
+
+    // 2. Adjust Storefront pendingPayout
+    const storefronts = this.getStorefronts();
+    const updatedStorefronts = storefronts.map((sf) => {
+      if (sf.id === balance.storefrontId || sf.resellerId === balance.creatorId) {
+        const newPending = Math.max(0, (sf.pendingPayout || 0) - payAmount);
+        return {
+          ...sf,
+          pendingPayout: newPending,
+        };
+      }
+      return sf;
+    });
+    this.setItem(STORAGE_KEYS.STOREFRONTS, updatedStorefronts);
+
+    // 3. Log Admin Audit Trail
+    this.logAdminAction(
+      'CREATOR_MANUAL_PAYOUT',
+      'payout',
+      newPayout.id,
+      `Admin ${adminName} recorded manual payment of ${payAmount.toLocaleString()} ETB to ${balance.creatorName} (${balance.storefrontName}) via ${params.paymentMethod}${
+        params.transactionReference ? ` [Ref: ${params.transactionReference}]` : ''
+      }.`,
+      {
+        targetName: balance.creatorName,
+        reason: `Manual Payout ${params.paymentMethod} (Ref: ${params.transactionReference || 'None'}, Period: ${newPayout.commissionPeriod || 'N/A'})`,
+      }
+    );
+
+    // 4. Create Notification for Creator
+    const methodLabels: Record<string, string> = {
+      telebirr: 'Telebirr',
+      bank_transfer: 'Bank Transfer',
+      cbe_birr: 'CBE Birr',
+      cash: 'Cash Handover',
+      other: 'Direct Transfer',
+    };
+    const readableMethod = methodLabels[params.paymentMethod] || params.paymentMethod;
+
+    this.createNotification({
+      userId: balance.creatorId,
+      userRole: 'reseller',
+      type: 'commission_payout_paid',
+      title: 'Commission Payment Paid!',
+      message: `Your commission payment of ${payAmount.toLocaleString()} ETB has been marked as paid via ${readableMethod}${
+        params.transactionReference ? ` (Ref: ${params.transactionReference})` : ''
+      }.`,
+      link: '/reseller/commissions',
+    });
+
+    this.notify();
+    return newPayout;
   }
 
   // --- FOLLOWERS ---

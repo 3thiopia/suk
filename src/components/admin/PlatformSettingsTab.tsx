@@ -10,6 +10,9 @@ export function PlatformSettingsTab() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     storage.updatePlatformSettings(settings);
+    if (settings.minPayoutThreshold !== undefined) {
+      storage.setMinPayoutAmount(settings.minPayoutThreshold);
+    }
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
@@ -78,14 +81,14 @@ export function PlatformSettingsTab() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-neutral-800 mb-1">Min Payout Threshold ($)</label>
+              <label className="block text-xs font-bold text-neutral-800 mb-1">Min Creator Payout Amount (ETB)</label>
               <input
                 type="number"
                 value={settings.minPayoutThreshold}
                 onChange={(e) => setSettings({ ...settings, minPayoutThreshold: parseFloat(e.target.value) || 0 })}
                 className="w-full rounded-xl border border-neutral-300 p-3 text-xs focus:ring-2 focus:ring-neutral-900 focus:outline-none font-mono font-bold"
               />
-              <p className="text-[10px] text-neutral-400 mt-1">Minimum accrued earnings to trigger monthly ACH transfer</p>
+              <p className="text-[10px] text-neutral-400 mt-1">Minimum accrued commission balance required for manual payout eligibility</p>
             </div>
 
             <div>

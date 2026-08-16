@@ -1,45 +1,82 @@
 import React, { useState } from 'react';
-import { DollarSign, Calendar, TrendingUp, AlertCircle, CheckCircle2, Clock, ShieldAlert } from 'lucide-react';
+import {
+  DollarSign,
+  Calendar,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  ShieldCheck,
+  CreditCard,
+  History,
+  Phone,
+  FileText,
+  Info,
+  Check,
+} from 'lucide-react';
 import { storage } from '../../lib/storage';
-import { formatCurrency, formatDate, formatShortDate } from '../../lib/utils';
+import { formatETB, formatDate, formatShortDate } from '../../lib/utils';
 import { StatCard } from '../common/StatCard';
 import { Badge } from '../common/Badge';
 import { ResponsiveDataTable, Column } from '../common/ResponsiveDataTable';
 import { ViewMode } from '../common/ViewToggle';
+import { CreatorPayout } from '../../types';
 
 export function CommissionPayoutsView() {
   const currentUser = storage.getCurrentUser();
   const storefront = storage.getStorefrontByResellerId(currentUser.id);
+  const minPayoutAmount = storage.getMinPayoutAmount();
 
-  const [threshold, setThreshold] = useState(storefront?.minPayoutThreshold || 50.00);
-  const [successMsg, setSuccessMsg] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
     typeof window !== 'undefined' && window.innerWidth < 640 ? 'cards' : 'table'
   );
 
-  if (!storefront) return null;
+  // Subscribe to storage updates for real-time reactivity
+  const [, setStorageTick] = useState(0);
+  React.useEffect(() => {
+    const unsubscribe = storage.subscribe(() => {
+      setStorageTick((prev) => prev + 1);
+    });
+    return unsubscribe;
+  }, []);
 
-  const payouts = storage.getPayoutsByReseller(currentUser.id);
+  if (!storefront) {
+    return (
+      <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-center">
+        <AlertCircle className="mx-auto h-8 w-8 text-neutral-400 mb-2" />
+        <h3 className="text-sm font-bold text-neutral-800">No Storefront Found</h3>
+        <p className="text-xs text-neutral-500 mt-1">Please set up your creator storefront to start earning commissions.</p>
+      </div>
+    );
+  }
 
-  const handleSaveThreshold = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    if (threshold < 50) {
-      setErrorMsg('You cannot set payout threshold below the platform minimum ($50.00).');
-      return;
-    }
-
-    storage.updateStorefront(storefront.id, { minPayoutThreshold: threshold });
-    setSuccessMsg('Payout threshold successfully updated!');
-    setTimeout(() => setSuccessMsg(''), 3000);
+  // Get balance details calculated by storage
+  const balances = storage.getCreatorCommissionBalances();
+  const myBalance = balances.find((b) => b.creatorId === currentUser.id) || {
+    creatorId: currentUser.id,
+    creatorName: currentUser.name,
+    creatorEmail: currentUser.email,
+    creatorPhone: currentUser.phone || '',
+    storefrontId: storefront.id,
+    storefrontName: storefront.storeName,
+    totalCommissionEarned: storefront.totalEarnings || 0,
+    alreadyPaid: 0,
+    unpaidCommission: storefront.pendingPayout || 0,
+    status: (storefront.pendingPayout >= minPayoutAmount && storefront.pendingPayout > 0
+      ? 'eligible'
+      : storefront.pendingPayout === 0
+      ? 'paid'
+      : 'not_eligible') as any,
+    minPayoutRequirement: minPayoutAmount,
   };
 
-  const isEligibleForNextBatch = storefront.pendingPayout >= storefront.minPayoutThreshold;
+  const manualPayouts = storage.getCreatorPayoutsByCreatorId(currentUser.id);
 
-  const payoutColumns: Column<any>[] = [
+  const isEligible = myBalance.status === 'eligible';
+  const isPaid = myBalance.status === 'paid';
+  const deficit = Math.max(0, minPayoutAmount - myBalance.unpaidCommission);
+
+  const payoutColumns: Column<CreatorPayout>[] = [
     {
       key: 'id',
       header: 'Payout ID',
@@ -47,126 +84,222 @@ export function CommissionPayoutsView() {
       cell: (p) => <span className="font-mono font-bold text-neutral-900">#{p.id}</span>,
     },
     {
-      key: 'period',
-      header: 'Period',
-      priority: 'secondary',
-      cell: (p) => <span className="text-neutral-600">{p.periodStart} to {p.periodEnd}</span>,
+      key: 'paidAt',
+      header: 'Payment Date',
+      priority: 'primary',
+      cell: (p) => <span className="text-neutral-700 font-medium">{formatDate(p.paidAt)}</span>,
     },
     {
       key: 'amount',
-      header: 'Amount',
+      header: 'Amount Paid',
+      priority: 'primary',
+      cell: (p) => <span className="font-mono font-black text-emerald-700">{formatETB(p.amount)}</span>,
+    },
+    {
+      key: 'paymentMethod',
+      header: 'Payment Method',
       priority: 'secondary',
-      cell: (p) => <span className="font-extrabold text-emerald-700">{formatCurrency(p.amount)}</span>,
+      cell: (p) => (
+        <span className="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-2 py-0.5 text-[11px] font-bold text-neutral-800 uppercase font-mono">
+          <CreditCard className="h-3 w-3 text-neutral-500" />
+          {p.paymentMethod.replace('_', ' ')}
+        </span>
+      ),
+    },
+    {
+      key: 'transactionReference',
+      header: 'Transaction Reference #',
+      priority: 'secondary',
+      cell: (p) => (
+        <span className="font-mono font-bold text-neutral-900">
+          {p.transactionReference || <span className="italic text-neutral-400">Direct Handover</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'commissionPeriod',
+      header: 'Settlement Period',
+      priority: 'secondary',
+      cell: (p) => <span className="text-neutral-600 text-xs">{p.commissionPeriod || 'N/A'}</span>,
     },
     {
       key: 'status',
       header: 'Status',
       priority: 'secondary',
-      cell: () => <Badge variant="success">PROCESSED</Badge>,
-    },
-    {
-      key: 'date',
-      header: 'Transfer Date',
-      priority: 'secondary',
-      cell: (p) => <span className="text-neutral-500">{formatDate(p.payoutDate)}</span>,
+      cell: () => (
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-black uppercase text-emerald-700">
+          <CheckCircle2 className="h-3 w-3" /> Paid
+        </span>
+      ),
     },
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6" id="creator-commission-view">
+      {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-neutral-900">Commission & Monthly Payouts</h1>
-        <p className="text-xs text-neutral-500">
-          Commission accumulates on every storefront order and is distributed via monthly automated admin payouts.
+        <h1 className="text-xl font-black text-neutral-900">Creator Commission & Payouts</h1>
+        <p className="text-xs text-neutral-500 mt-0.5">
+          Track your earned commissions from customer orders, review unpaid balances, and monitor manual settlements via Telebirr or Bank Transfer.
         </p>
       </div>
 
-      {/* Analytics */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          title="Accumulated Total Earnings"
-          value={formatCurrency(storefront.totalEarnings)}
-          subtitle="All-time storefront sales commissions"
-          icon={DollarSign}
-          color="emerald"
-        />
-        <StatCard
-          title="Current Pending Payout"
-          value={formatCurrency(storefront.pendingPayout)}
-          subtitle={isEligibleForNextBatch ? 'Ready for next monthly payout' : 'Below payout threshold'}
-          icon={TrendingUp}
-          color="amber"
-        />
-        <StatCard
-          title="Payout Threshold"
-          value={formatCurrency(storefront.minPayoutThreshold)}
-          subtitle="Platform min: $50.00"
-          icon={Calendar}
-          color="purple"
-        />
-      </div>
+      {/* Eligibility Status Banner */}
+      {isEligible ? (
+        <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs">
+              <CheckCircle2 className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-emerald-200 text-emerald-900 px-2 py-0.5 text-[10px] font-black uppercase">
+                  Eligible for Payout
+                </span>
+                <span className="text-xs text-emerald-800 font-bold">Minimum Requirement Met</span>
+              </div>
+              <p className="text-sm font-black text-emerald-950 mt-1">
+                Your available balance of {formatETB(myBalance.unpaidCommission)} meets the {formatETB(minPayoutAmount)} minimum threshold.
+              </p>
+              <p className="text-xs text-emerald-800 mt-0.5">
+                Platform admins will process your manual payout via Telebirr or Bank Transfer during the upcoming settlement window.
+              </p>
+            </div>
+          </div>
 
-      {/* Threshold Configuration Card */}
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 space-y-4">
-        <div className="flex items-center justify-between">
+          <div className="shrink-0 bg-white/80 backdrop-blur-xs rounded-xl p-3 border border-emerald-200 text-right">
+            <p className="text-[10px] font-bold uppercase text-emerald-800">Available Unpaid Balance</p>
+            <p className="text-xl font-black text-emerald-700 font-mono">{formatETB(myBalance.unpaidCommission)}</p>
+          </div>
+        </div>
+      ) : isPaid ? (
+        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-5 shadow-xs flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-200 text-neutral-700">
+            <Check className="h-6 w-6" />
+          </div>
           <div>
-            <h3 className="text-sm font-bold text-neutral-900">Configure Payout Threshold</h3>
+            <span className="rounded-full bg-neutral-200 text-neutral-800 px-2 py-0.5 text-[10px] font-black uppercase">
+              All Settled
+            </span>
+            <p className="text-sm font-bold text-neutral-800 mt-1">
+              All earned commissions have been paid out in full!
+            </p>
             <p className="text-xs text-neutral-500">
-              Resellers may increase payout threshold to accumulate larger payouts. You cannot set it below $50.00.
+              Share your storefront link to make more sales and earn new commissions.
             </p>
           </div>
-          <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700">
-            Current: {formatCurrency(storefront.minPayoutThreshold)}
-          </span>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs">
+                <Clock className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-amber-200 text-amber-900 px-2 py-0.5 text-[10px] font-black uppercase">
+                    Not Eligible Yet
+                  </span>
+                  <span className="text-xs text-amber-800 font-bold">Below Minimum Threshold</span>
+                </div>
+                <p className="text-sm font-bold text-neutral-900 mt-1">
+                  You need <span className="font-black text-amber-800 font-mono">{formatETB(deficit)}</span> more to reach the {formatETB(minPayoutAmount)} minimum payout threshold.
+                </p>
+                <p className="text-xs text-neutral-600 mt-0.5">
+                  Current unpaid commission balance: <strong className="font-mono text-neutral-900">{formatETB(myBalance.unpaidCommission)}</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="shrink-0 bg-white rounded-xl p-3 border border-amber-200 text-right">
+              <p className="text-[10px] font-bold uppercase text-neutral-400">Current Balance</p>
+              <p className="text-lg font-black text-amber-700 font-mono">{formatETB(myBalance.unpaidCommission)}</p>
+            </div>
+          </div>
+
+          {/* Progress bar towards threshold */}
+          <div>
+            <div className="flex justify-between text-[11px] font-bold text-neutral-600 mb-1">
+              <span>Progress towards payout</span>
+              <span>{Math.min(100, Math.round((myBalance.unpaidCommission / minPayoutAmount) * 100))}%</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-amber-200/60 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, (myBalance.unpaidCommission / minPayoutAmount) * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Analytics Cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-neutral-500">Total Earned Commissions</p>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+              <DollarSign className="h-4 w-4" />
+            </span>
+          </div>
+          <p className="mt-2 text-2xl font-black text-neutral-900 font-mono">
+            {formatETB(myBalance.totalCommissionEarned)}
+          </p>
+          <p className="mt-1 text-[11px] text-neutral-400">All-time delivered order earnings</p>
         </div>
 
-        {successMsg && (
-          <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-800 border border-emerald-200">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            {successMsg}
+        <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-neutral-500">Already Paid Out</p>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-100 text-neutral-600">
+              <CheckCircle2 className="h-4 w-4" />
+            </span>
           </div>
-        )}
+          <p className="mt-2 text-2xl font-black text-neutral-900 font-mono">
+            {formatETB(myBalance.alreadyPaid)}
+          </p>
+          <p className="mt-1 text-[11px] text-neutral-400">{manualPayouts.length} past manual settlements</p>
+        </div>
 
-        {errorMsg && (
-          <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-800 border border-rose-200">
-            <AlertCircle className="h-4 w-4 text-rose-600" />
-            {errorMsg}
+        <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-neutral-500">Minimum Payout Requirement</p>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+              <Calendar className="h-4 w-4" />
+            </span>
           </div>
-        )}
+          <p className="mt-2 text-2xl font-black text-purple-700 font-mono">
+            {formatETB(minPayoutAmount)}
+          </p>
+          <p className="mt-1 text-[11px] text-neutral-400">Set by platform operator</p>
+        </div>
+      </div>
 
-        <form onSubmit={handleSaveThreshold} className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1 max-w-xs">
-            <span className="absolute left-3 top-2.5 text-xs text-neutral-400 font-bold">$</span>
-            <input
-              type="number"
-              step="10"
-              min="50"
-              required
-              value={threshold}
-              onChange={(e) => setThreshold(parseFloat(e.target.value) || 50)}
-              className="w-full rounded-lg border border-neutral-200 bg-neutral-50 py-2.5 pl-7 pr-3 text-xs text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900 font-bold"
-            />
-          </div>
-          <button
-            type="submit"
-            className="rounded-lg bg-neutral-900 px-5 py-2.5 text-xs font-bold text-white hover:bg-neutral-800 shadow-2xs"
-          >
-            Update Threshold
-          </button>
-        </form>
+      {/* Manual Payouts Policy Notice */}
+      <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs space-y-3">
+        <div className="flex items-center gap-2 text-neutral-900 font-bold text-xs">
+          <Info className="h-4 w-4 text-emerald-600" />
+          <span>How SUK Manual Creator Payouts Work</span>
+        </div>
+        <p className="text-xs text-neutral-600 leading-relaxed">
+          Commissions are tracked from all delivered orders placed through your storefront link. When your unpaid balance reaches or exceeds the <strong>{formatETB(minPayoutAmount)}</strong> minimum payout threshold, SUK Admins process your payout manually via <strong>Telebirr</strong> or <strong>Bank Transfer</strong>. You will receive a notification and reference receipt for every payout.
+        </p>
       </div>
 
       {/* Payout History Table */}
       <div className="space-y-4">
         <ResponsiveDataTable
-          title="Payout History"
-          data={payouts}
+          title="Manual Settlement & Payout History"
+          data={manualPayouts}
           columns={payoutColumns}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           showViewToggle={true}
-          emptyTitle="No Payout History"
-          emptyDescription="No monthly payouts processed yet."
+          emptyTitle="No Payout History Yet"
+          emptyDescription="When platform admins process your commission settlements, they will be logged here."
         />
       </div>
     </div>

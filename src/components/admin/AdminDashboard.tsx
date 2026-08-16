@@ -80,6 +80,7 @@ export function AdminDashboard({ onNavigate, activeTab: initialTab = 'overview' 
   const productAppeals = storage.getProductAppeals();
   const orderReports = storage.getOrderReports();
   const reviewReports = storage.getReviewReports();
+  const payoutStats = storage.getPayoutSummaryStats();
 
   const openDisputesCount = disputes.filter((d) => d.status === 'open' || d.status === 'investigating').length;
   const pendingReportsCount = reports.filter((r) => r.status === 'pending').length;
@@ -88,6 +89,7 @@ export function AdminDashboard({ onNavigate, activeTab: initialTab = 'overview' 
   const pendingProductAppealsCount = productAppeals.filter((a) => a.status === 'pending').length;
   const openOrderReportsCount = orderReports.filter((r) => r.status === 'open' || r.status === 'investigating').length;
   const openReviewReportsCount = reviewReports.filter((r) => r.status === 'open').length;
+  const eligiblePayoutsCount = payoutStats.eligibleCreatorsCount;
 
   const tabs = [
     { id: 'overview', label: 'Dashboard', icon: BarChart3 },
@@ -100,7 +102,7 @@ export function AdminDashboard({ onNavigate, activeTab: initialTab = 'overview' 
     { id: 'appeals', label: 'Account Appeals', icon: UserCheck, badge: pendingAccountAppealsCount },
     { id: 'orders', label: 'Orders & Timelines', icon: ShoppingBag },
     { id: 'order-reports', label: 'Order Reports', icon: ShieldAlert, badge: openOrderReportsCount },
-    { id: 'commissions', label: 'Payouts', icon: DollarSign },
+    { id: 'commissions', label: 'Creator Payouts', icon: DollarSign, badge: eligiblePayoutsCount },
     { id: 'disputes', label: 'Disputes', icon: AlertCircle, badge: openDisputesCount },
     { id: 'reports', label: 'Moderation Reports', icon: ShieldAlert, badge: pendingReportsCount },
     { id: 'categories', label: 'Categories', icon: FolderTree },
