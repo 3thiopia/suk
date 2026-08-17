@@ -128,12 +128,22 @@ class MarketplaceStorageService {
   public async syncWithSupabase() {
     if (!isSupabaseConfigured()) return;
     try {
-      const [remoteUsers, remoteBusinesses, remoteProducts, remoteStorefronts, remoteOrders] = await Promise.all([
+      const [
+        remoteUsers,
+        remoteBusinesses,
+        remoteProducts,
+        remoteStorefronts,
+        remoteOrders,
+        remoteStorefrontProducts,
+        remoteCollections,
+      ] = await Promise.all([
         supabaseDbService.getUsers(),
         supabaseDbService.getBusinesses(),
         supabaseDbService.getProducts(),
         supabaseDbService.getStorefronts(),
         supabaseDbService.getOrders(),
+        supabaseDbService.getStorefrontProducts(),
+        supabaseDbService.getCollections(),
       ]);
 
       if (remoteUsers.length > 0) this.setItem(STORAGE_KEYS.USERS, remoteUsers);
@@ -141,6 +151,8 @@ class MarketplaceStorageService {
       if (remoteProducts.length > 0) this.setItem(STORAGE_KEYS.PRODUCTS, remoteProducts);
       if (remoteStorefronts.length > 0) this.setItem(STORAGE_KEYS.STOREFRONTS, remoteStorefronts);
       if (remoteOrders.length > 0) this.setItem(STORAGE_KEYS.ORDERS, remoteOrders);
+      if (remoteStorefrontProducts.length > 0) this.setItem(STORAGE_KEYS.STOREFRONT_PRODUCTS, remoteStorefrontProducts);
+      if (remoteCollections.length > 0) this.setItem(STORAGE_KEYS.COLLECTIONS, remoteCollections);
       this.notify();
     } catch (err) {
       console.warn('Supabase sync warning:', err);
@@ -260,7 +272,7 @@ class MarketplaceStorageService {
       if (!localStorage.getItem(STORAGE_KEYS.CREATOR_MIN_PAYOUT)) {
         localStorage.setItem(STORAGE_KEYS.CREATOR_MIN_PAYOUT, JSON.stringify(1000));
       }
-      // Ensure Ethiopian creator users and storefronts exist in local storage if not already added
+      // Ensure Ethiopian creator users, storefronts, collections, and products exist in local storage
       try {
         const storedUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]') as User[];
         const missingUsers = initialUsers.filter((iu) => !storedUsers.some((su) => su.id === iu.id));
@@ -273,8 +285,20 @@ class MarketplaceStorageService {
         if (missingStorefronts.length > 0) {
           localStorage.setItem(STORAGE_KEYS.STOREFRONTS, JSON.stringify([...storedStorefronts, ...missingStorefronts]));
         }
+
+        const storedCollections = JSON.parse(localStorage.getItem(STORAGE_KEYS.COLLECTIONS) || '[]') as Collection[];
+        const missingCollections = initialCollections.filter((ic) => !storedCollections.some((sc) => sc.id === ic.id));
+        if (missingCollections.length > 0) {
+          localStorage.setItem(STORAGE_KEYS.COLLECTIONS, JSON.stringify([...storedCollections, ...missingCollections]));
+        }
+
+        const storedStorefrontProducts = JSON.parse(localStorage.getItem(STORAGE_KEYS.STOREFRONT_PRODUCTS) || '[]') as StorefrontProduct[];
+        const missingStorefrontProducts = initialStorefrontProducts.filter((isp) => !storedStorefrontProducts.some((ssp) => ssp.id === isp.id));
+        if (missingStorefrontProducts.length > 0) {
+          localStorage.setItem(STORAGE_KEYS.STOREFRONT_PRODUCTS, JSON.stringify([...storedStorefrontProducts, ...missingStorefrontProducts]));
+        }
       } catch (e) {
-        console.error('Failed to sync initial creators', e);
+        console.error('Failed to sync initial entities', e);
       }
     }
   }
@@ -574,13 +598,72 @@ class MarketplaceStorageService {
     return this.getItem<Storefront[]>(STORAGE_KEYS.STOREFRONTS, initialStorefronts);
   }
 
+  /**
+   * Universal storefront resolver that finds storefronts across:
+   * 1. Exact ID match (sf_..., store_...)
+   * 2. Direct slug match (e.g. techtrends, abebe-store)
+   * 3. Creator/Reseller user ID match (usr_reseller_1, usr_creator_abebe)
+   * 4. Previous/historical slug aliases
+   * 5. Store custom domain / subdomain prefix match
+   * 6. Case-insensitive slug / store name match
+   */
+  public getStorefront(identifier?: string | null): Storefront | undefined {
+    if (!identifier) return undefined;
+    const raw = identifier.trim();
+    if (!raw) return undefined;
+    const clean = normalizeSlug(raw);
+    const storefronts = this.getStorefronts();
+
+    // 1. Direct ID match
+    let match = storefronts.find((s) => s.id === raw || (clean && s.id === clean));
+    if (match) return match;
+
+    // 2. Direct Slug match
+    if (clean) {
+      match = storefronts.find((s) => s.slug === clean || s.slug.toLowerCase() === clean.toLowerCase());
+      if (match) return match;
+    }
+
+    // 3. Reseller / Creator User ID match
+    match = storefronts.find((s) => s.resellerId === raw || (clean && s.resellerId === clean));
+    if (match) return match;
+
+    // 4. Historical slug aliases
+    if (clean) {
+      match = storefronts.find((s) => s.previousSlugs && s.previousSlugs.some((ps) => ps === clean || ps.toLowerCase() === clean.toLowerCase()));
+      if (match) return match;
+    }
+
+    // 5. Store domain match (e.g. techtrends.mystore.et or techtrends)
+    match = storefronts.find((s) => s.storeDomain && (
+      s.storeDomain.toLowerCase() === raw.toLowerCase() ||
+      s.storeDomain.toLowerCase().startsWith(raw.toLowerCase() + '.') ||
+      (clean && s.storeDomain.toLowerCase().startsWith(clean.toLowerCase() + '.'))
+    ));
+    if (match) return match;
+
+    // 6. Case-insensitive store name match
+    match = storefronts.find((s) => s.storeName.toLowerCase() === raw.toLowerCase());
+    if (match) return match;
+
+    return undefined;
+  }
+
+  public getStorefrontById(id: string): Storefront | undefined {
+    return this.getStorefront(id);
+  }
+
+  public getStorefrontBySlug(slug: string): Storefront | undefined {
+    return this.getStorefront(slug);
+  }
+
   public getStorefrontByResellerId(resellerId: string): Storefront {
     const storefronts = this.getStorefronts();
-    let sf = storefronts.find((s) => s.resellerId === resellerId);
+    let sf = storefronts.find((s) => s.resellerId === resellerId || s.id === resellerId);
 
     if (!sf) {
       const user = this.getUsers().find((u) => u.id === resellerId);
-      const rawName = user ? user.name.split('(')[0].trim() : 'Reseller';
+      const rawName = user ? user.name.split('(')[0].trim() : 'Creator';
       const storeName = `${rawName}'s Storefront`;
       const slug = generateUniqueSlug(storeName);
       const storeDomain = getStorefrontFullDomain(slug);
@@ -592,13 +675,13 @@ class MarketplaceStorageService {
         slug: slug,
         storeDomain: storeDomain,
         previousSlugs: [],
-        logoUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+        logoUrl: user?.avatarUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
         bannerUrl: 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?auto=format&fit=crop&w=1200&q=80',
         bannerTitle: storeName,
-        bannerSubtitle: 'Hand-selected white-label products curated with precision.',
+        bannerSubtitle: 'Hand-selected quality products curated with passion.',
         themeColor: 'emerald',
         layoutMode: 'grid',
-        minPayoutThreshold: 50.0,
+        minPayoutThreshold: 1000.0,
         totalEarnings: 0,
         pendingPayout: 0,
         totalOrdersCount: 0,
@@ -607,6 +690,23 @@ class MarketplaceStorageService {
       };
 
       this.setItem(STORAGE_KEYS.STOREFRONTS, [...storefronts, sf]);
+
+      // Automatically seed default storefront products so creator preview and catalog are never empty
+      const availableProducts = this.getProducts().filter((p) => p.status === 'active' && !p.isHidden);
+      if (availableProducts.length > 0) {
+        const initialSps: StorefrontProduct[] = availableProducts.slice(0, 4).map((p, idx) => ({
+          id: `stp_${sf!.id}_${p.id}`,
+          storefrontId: sf!.id,
+          productId: p.id,
+          isVisible: true,
+          displayOrder: idx + 1,
+          customCoverImage: p.images?.[0],
+          collectionIds: [],
+          addedAt: new Date().toISOString(),
+        }));
+        const existingSps = this.getStorefrontProducts();
+        this.setItem(STORAGE_KEYS.STOREFRONT_PRODUCTS, [...initialSps, ...existingSps]);
+      }
     } else if (!sf.storeDomain) {
       // Backfill storeDomain if missing
       sf.storeDomain = getStorefrontFullDomain(sf.slug);
@@ -614,20 +714,6 @@ class MarketplaceStorageService {
     }
 
     return sf;
-  }
-
-  public getStorefrontBySlug(slug: string): Storefront | undefined {
-    const clean = normalizeSlug(slug);
-    if (!clean) return undefined;
-
-    const storefronts = this.getStorefronts();
-    // Direct match
-    let match = storefronts.find((s) => s.slug === clean);
-    if (match) return match;
-
-    // Check historical alias
-    match = storefronts.find((s) => s.previousSlugs && s.previousSlugs.includes(clean));
-    return match;
   }
 
   public updateStorefront(id: string, updates: Partial<Storefront>) {
@@ -665,18 +751,35 @@ class MarketplaceStorageService {
 
   public getStorefrontProductsWithDetails(storefrontId: string): StorefrontProduct[] {
     const sProducts = this.getStorefrontProducts().filter((sp) => sp.storefrontId === storefrontId);
-    const allProducts = this.getProducts();
+    const allProducts = this.getProducts().filter((p) => p.status === 'active' && !p.isHidden);
 
-    return sProducts
-      .map((sp) => {
-        const product = allProducts.find((p) => p.id === sp.productId);
-        return {
-          ...sp,
-          product,
-        };
-      })
-      .filter((sp) => sp.product !== undefined && !sp.product.isHidden)
-      .sort((a, b) => a.displayOrder - b.displayOrder);
+    if (sProducts.length > 0) {
+      const detailed = sProducts
+        .map((sp) => {
+          const product = allProducts.find((p) => p.id === sp.productId);
+          return {
+            ...sp,
+            product,
+          };
+        })
+        .filter((sp) => sp.product !== undefined && !sp.product.isHidden)
+        .sort((a, b) => a.displayOrder - b.displayOrder);
+
+      if (detailed.length > 0) return detailed;
+    }
+
+    // Fallback: If storefront has no explicit items assigned yet, surface curated active products
+    return allProducts.slice(0, 8).map((p, idx) => ({
+      id: `stp_curated_${storefrontId}_${p.id}`,
+      storefrontId,
+      productId: p.id,
+      isVisible: true,
+      displayOrder: idx + 1,
+      customCoverImage: p.images?.[0],
+      collectionIds: [],
+      addedAt: new Date().toISOString(),
+      product: p,
+    }));
   }
 
   public addProductToStorefront(storefrontId: string, productId: string): StorefrontProduct {

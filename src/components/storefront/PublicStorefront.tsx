@@ -26,6 +26,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { storage } from '../../lib/storage';
+import { isSupabaseConfigured, supabaseDbService } from '../../lib/supabase';
 import { Storefront, StorefrontProduct, Product, Collection, CartItem, StorefrontCustomization } from '../../types';
 import { formatCurrency } from '../../lib/utils';
 import { Modal } from '../common/Modal';
@@ -62,28 +63,157 @@ export function PublicStorefront({
 }: PublicStorefrontProps) {
   const { t } = useTranslation();
 
-  const fetchedStorefront = storefrontOverride
-    ? storefrontOverride
-    : slug
-    ? storage.getStorefrontBySlug(slug)
-    : storage.getStorefronts()[0];
+  // Initial lookup from props or storage
+  const [storefront, setStorefront] = useState<Storefront | null>(() => {
+    if (storefrontOverride) return storefrontOverride;
+    if (slug) {
+      return storage.getStorefront(slug) || storage.getStorefrontBySlug(slug) || null;
+    }
+    return storage.getStorefronts()[0] || null;
+  });
 
-  useStorefrontMeta(fetchedStorefront);
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    if (storefrontOverride) return false;
+    if (slug) {
+      const found = storage.getStorefront(slug) || storage.getStorefrontBySlug(slug);
+      return !found;
+    }
+    return false;
+  });
 
-  if (slug && !fetchedStorefront) {
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Sync / verify storefront if not found initially or when slug/override changes
+  useEffect(() => {
+    if (storefrontOverride) {
+      setStorefront(storefrontOverride);
+      setIsLoading(false);
+      return;
+    }
+
+    if (!slug) {
+      const defaultSf = storage.getStorefronts()[0] || null;
+      setStorefront(defaultSf);
+      setIsLoading(false);
+      return;
+    }
+
+    // Try local storage first
+    const localSf = storage.getStorefront(slug) || storage.getStorefrontBySlug(slug);
+    if (localSf) {
+      setStorefront(localSf);
+      setIsLoading(false);
+      return;
+    }
+
+    // If not found in local storage, check remote Supabase if available
+    let isCancelled = false;
+    setIsLoading(true);
+    setLoadError(null);
+
+    const resolveRemote = async () => {
+      try {
+        if (isSupabaseConfigured()) {
+          const remoteSf = await supabaseDbService.getStorefrontBySlug(slug);
+          if (!isCancelled) {
+            if (remoteSf) {
+              setStorefront(remoteSf);
+              // Save to local storage for caching
+              storage.updateStorefront(remoteSf.id, remoteSf);
+            } else {
+              setStorefront(null);
+            }
+            setIsLoading(false);
+          }
+        } else {
+          if (!isCancelled) {
+            setStorefront(null);
+            setIsLoading(false);
+          }
+        }
+      } catch (err: any) {
+        if (!isCancelled) {
+          console.error('Failed to load storefront from Supabase:', err);
+          setLoadError(err.message || 'Database network error');
+          setIsLoading(false);
+        }
+      }
+    };
+
+    resolveRemote();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [slug, storefrontOverride]);
+
+  // Subscribe to local storage updates
+  useEffect(() => {
+    const unsubscribe = storage.subscribe(() => {
+      if (!storefrontOverride) {
+        if (slug) {
+          const updated = storage.getStorefront(slug) || storage.getStorefrontBySlug(slug);
+          if (updated) setStorefront(updated);
+        } else {
+          const first = storage.getStorefronts()[0];
+          if (first) setStorefront(first);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [slug, storefrontOverride]);
+
+  useStorefrontMeta(storefront);
+
+  // 1. Loading State (Shown while pending verification)
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 p-6 font-sans">
+        <div className="w-10 h-10 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4" />
+        <h2 className="text-base font-bold text-slate-900 dark:text-white">Loading storefront...</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 text-center">
+          Retrieving creator catalog & theme customization
+        </p>
+      </div>
+    );
+  }
+
+  // 2. Database/Network Error State
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-6 font-sans text-center">
+        <div className="max-w-md w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+          <h2 className="text-lg font-bold text-rose-600">Storefront Connection Issue</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            We encountered a network or database issue while retrieving this storefront.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-colors"
+          >
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Genuine Not Found State
+  if (slug && !storefront) {
     return <StoreNotFoundView slug={slug} onNavigate={onNavigate} />;
   }
 
-  if (fetchedStorefront && (fetchedStorefront.status === 'suspended' || fetchedStorefront.isDisabled)) {
-    return <StoreUnavailableView storefront={fetchedStorefront} onNavigate={onNavigate} />;
+  // 4. Suspended / Disabled State
+  if (storefront && (storefront.status === 'suspended' || storefront.isDisabled)) {
+    return <StoreUnavailableView storefront={storefront} onNavigate={onNavigate} />;
   }
 
-  const storefront = fetchedStorefront || storage.getStorefronts()[0];
-  const storefrontProducts = storage.getStorefrontProductsWithDetails(storefront.id).filter((sp) => sp.isVisible);
-  const collections = storage.getCollections(storefront.id);
+  const activeStorefront = storefront || storage.getStorefronts()[0];
+  const storefrontProducts = storage.getStorefrontProductsWithDetails(activeStorefront.id).filter((sp) => sp.isVisible);
+  const collections = storage.getCollections(activeStorefront.id);
 
   const customization: StorefrontCustomization =
-    customizationOverride || storefront.customization || getDefaultCustomization(storefront);
+    customizationOverride || activeStorefront.customization || getDefaultCustomization(activeStorefront);
 
   const { hero, colors, typography, buttons, cards, storeLayout, navigation, footer, sections, headerLayout } =
     customization;

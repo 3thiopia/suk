@@ -347,14 +347,18 @@ export function resolveSlugWithAliasCheck(
 
   const storefronts = storage.getStorefronts();
 
-  // Check direct slug match first
-  const directMatch = storefronts.find((s) => s.slug === clean);
+  // Check direct slug or ID match first
+  const directMatch = storefronts.find(
+    (s) => s.slug === clean || s.slug.toLowerCase() === clean.toLowerCase() || s.id === extractedSlug || s.resellerId === extractedSlug
+  );
   if (directMatch) {
     return { slug: directMatch.slug, isAliasMatch: false };
   }
 
   // Check historical alias match
-  const aliasMatch = storefronts.find((s) => s.previousSlugs && s.previousSlugs.includes(clean));
+  const aliasMatch = storefronts.find(
+    (s) => s.previousSlugs && s.previousSlugs.some((ps) => ps === clean || ps.toLowerCase() === clean.toLowerCase())
+  );
   if (aliasMatch) {
     return {
       slug: aliasMatch.slug,

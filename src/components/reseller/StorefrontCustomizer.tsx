@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Palette,
   Layout,
@@ -63,6 +63,7 @@ import {
   ColorMode,
   AnimationType,
   StorefrontTheme,
+  Storefront,
 } from '../../types';
 import { PublicStorefront } from '../storefront/PublicStorefront';
 import { SingleImageUploader } from '../common/SingleImageUploader';
@@ -187,7 +188,17 @@ function ToggleSwitch({
 
 export function StorefrontCustomizer({ onNavigate }: StorefrontCustomizerProps) {
   const currentUser = storage.getCurrentUser();
-  const storefront = storage.getStorefrontByResellerId(currentUser.id);
+  const initialSf = storage.getStorefrontByResellerId(currentUser.id) || storage.getStorefronts()[0];
+  const [storefront, setStorefront] = useState<Storefront>(initialSf);
+
+  // Subscribe to storage updates for storefront changes
+  useEffect(() => {
+    const unsub = storage.subscribe(() => {
+      const updated = storage.getStorefrontByResellerId(currentUser.id) || storage.getStorefronts()[0];
+      if (updated) setStorefront(updated);
+    });
+    return unsub;
+  }, [currentUser.id]);
 
   const initialCustomization =
     storefront?.customization || getDefaultCustomization(storefront);

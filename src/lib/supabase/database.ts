@@ -197,22 +197,112 @@ export const supabaseDbService = {
       id: s.id,
       resellerId: s.reseller_id,
       storeName: s.store_name,
-      slug: s.slug,
+      slug: s.slug || s.store_slug,
+      storeDomain: s.store_domain || (s.slug ? `${s.slug}.mystore.et` : undefined),
+      previousSlugs: s.previous_slugs || [],
       logoUrl: s.logo_url || '',
       bannerUrl: s.banner_url || '',
       bannerTitle: s.banner_title || s.store_name,
       bannerSubtitle: s.banner_subtitle || '',
       themeColor: s.theme_color as any,
       layoutMode: s.layout_mode as any,
-      minPayoutThreshold: Number(s.min_payout_threshold),
-      totalEarnings: Number(s.total_earnings),
-      pendingPayout: Number(s.pending_payout),
-      totalOrdersCount: s.total_orders_count,
+      minPayoutThreshold: Number(s.min_payout_threshold || 1000),
+      totalEarnings: Number(s.total_earnings || 0),
+      pendingPayout: Number(s.pending_payout || 0),
+      totalOrdersCount: s.total_orders_count || 0,
       createdAt: s.created_at,
       status: s.status as any,
       isDisabled: s.is_disabled,
       customization: (s.customization as any) || undefined,
     }));
+  },
+
+  async getStorefrontBySlug(slug: string): Promise<Storefront | null> {
+    const client = getSupabaseClient();
+    if (!client) return null;
+    const cleanSlug = slug.trim().toLowerCase();
+    const { data } = await (client.from('storefronts') as any)
+      .select('*')
+      .or(`slug.eq.${cleanSlug},id.eq.${cleanSlug},reseller_id.eq.${cleanSlug}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (!data) return null;
+    return {
+      id: data.id,
+      resellerId: data.reseller_id,
+      storeName: data.store_name,
+      slug: data.slug || data.store_slug,
+      storeDomain: data.store_domain || (data.slug ? `${data.slug}.mystore.et` : undefined),
+      previousSlugs: data.previous_slugs || [],
+      logoUrl: data.logo_url || '',
+      bannerUrl: data.banner_url || '',
+      bannerTitle: data.banner_title || data.store_name,
+      bannerSubtitle: data.banner_subtitle || '',
+      themeColor: data.theme_color as any,
+      layoutMode: data.layout_mode as any,
+      minPayoutThreshold: Number(data.min_payout_threshold || 1000),
+      totalEarnings: Number(data.total_earnings || 0),
+      pendingPayout: Number(data.pending_payout || 0),
+      totalOrdersCount: data.total_orders_count || 0,
+      createdAt: data.created_at,
+      status: data.status as any,
+      isDisabled: data.is_disabled,
+      customization: (data.customization as any) || undefined,
+    };
+  },
+
+  async getStorefrontProducts(): Promise<StorefrontProduct[]> {
+    const client = getSupabaseClient();
+    if (!client) return [];
+    const { data } = await (client.from('storefront_products') as any).select('*');
+    if (!data) return [];
+    return (data as any[]).map((sp) => ({
+      id: sp.id,
+      storefrontId: sp.storefront_id,
+      productId: sp.product_id,
+      isVisible: sp.is_visible !== false,
+      displayOrder: sp.display_order || 0,
+      customCoverImage: sp.custom_cover_image || undefined,
+      collectionIds: sp.collection_ids || [],
+      addedAt: sp.added_at || sp.created_at || new Date().toISOString(),
+    }));
+  },
+
+  async getCollections(): Promise<Collection[]> {
+    const client = getSupabaseClient();
+    if (!client) return [];
+    const { data } = await (client.from('collections') as any).select('*');
+    if (!data) return [];
+    return (data as any[]).map((c) => ({
+      id: c.id,
+      storefrontId: c.storefront_id,
+      title: c.title,
+      slug: c.slug,
+      description: c.description || undefined,
+      coverImage: c.cover_image || undefined,
+      createdAt: c.created_at || new Date().toISOString(),
+    }));
+  },
+
+  async getStorefrontSocialLinks(): Promise<any[]> {
+    const client = getSupabaseClient();
+    if (!client) return [];
+    const { data } = await (client.from('storefront_social_links') as any).select('*');
+    return data || [];
+  },
+
+  async saveStorefrontCustomization(storefrontId: string, customization: any): Promise<boolean> {
+    const client = getSupabaseClient();
+    if (!client) return false;
+    const { error } = await (client.from('storefronts') as any)
+      .update({
+        customization,
+        theme_color: customization.colors?.primary || undefined,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', storefrontId);
+    return !error;
   },
 
   // --- ORDERS & CHECKOUT ---

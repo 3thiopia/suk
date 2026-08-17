@@ -157,9 +157,22 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User>(initialUser);
   const [registerRole, setRegisterRole] = useState<'business_owner' | 'reseller'>('business_owner');
 
+  // Derive initial path strictly respecting the browser address bar first (e.g. /store/techtrends)
   const [currentPath, setCurrentPath] = useState<string>(() => {
-    const saved = localStorage.getItem('wl_current_path');
+    const browserPath = typeof window !== 'undefined' ? window.location.pathname : '/';
     const isAuth = storage.isAuthenticated();
+
+    // If the user lands directly on a valid browser path (such as /store/:slug, /product/:id, etc.)
+    if (browserPath && browserPath !== '/') {
+      if (isPublicRoute(browserPath)) {
+        return browserPath;
+      }
+      if (isAuth && isRouteAllowedForRole(browserPath, initialUser.role)) {
+        return browserPath;
+      }
+    }
+
+    const saved = localStorage.getItem('wl_current_path');
     if (isAuth) {
       if (saved && isRouteAllowedForRole(saved, initialUser.role)) {
         return saved;
@@ -184,6 +197,18 @@ export default function App() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
 
+  // Listen to browser Back/Forward navigation popstate events
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname || '/';
+      setCurrentPath(path);
+      localStorage.setItem('wl_current_path', path);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Subscribe to storage changes for reactive state updates
   useEffect(() => {
     const unsubscribe = storage.subscribe(() => {
@@ -197,6 +222,9 @@ export default function App() {
         setCurrentPath((prevPath) => {
           if (!isPublicRoute(prevPath)) {
             localStorage.setItem('wl_current_path', '/');
+            if (window.location.pathname !== '/') {
+              window.history.replaceState({}, '', '/');
+            }
             return '/';
           }
           return prevPath;
@@ -213,6 +241,9 @@ export default function App() {
     const targetRoute = getDefaultRouteForRole(user.role);
     setCurrentPath(targetRoute);
     localStorage.setItem('wl_current_path', targetRoute);
+    if (window.location.pathname !== targetRoute) {
+      window.history.pushState({}, '', targetRoute);
+    }
   };
 
   const handleAuthSuccess = (user: User) => {
@@ -221,6 +252,9 @@ export default function App() {
     const targetRoute = getDefaultRouteForRole(user.role);
     setCurrentPath(targetRoute);
     localStorage.setItem('wl_current_path', targetRoute);
+    if (window.location.pathname !== targetRoute) {
+      window.history.pushState({}, '', targetRoute);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -242,24 +276,26 @@ export default function App() {
 
     const cleanPath = path.split('?')[0];
     const isAuth = storage.isAuthenticated();
+    let targetPath = cleanPath;
 
     if (!isAuth) {
       if (isPublicRoute(cleanPath)) {
-        setCurrentPath(cleanPath);
-        localStorage.setItem('wl_current_path', cleanPath);
+        targetPath = cleanPath;
       } else {
-        setCurrentPath('/');
-        localStorage.setItem('wl_current_path', '/');
+        targetPath = '/';
       }
     } else {
       if (isRouteAllowedForRole(cleanPath, currentUser.role)) {
-        setCurrentPath(cleanPath);
-        localStorage.setItem('wl_current_path', cleanPath);
+        targetPath = cleanPath;
       } else {
-        const defaultPath = getDefaultRouteForRole(currentUser.role);
-        setCurrentPath(defaultPath);
-        localStorage.setItem('wl_current_path', defaultPath);
+        targetPath = getDefaultRouteForRole(currentUser.role);
       }
+    }
+
+    setCurrentPath(targetPath);
+    localStorage.setItem('wl_current_path', targetPath);
+    if (typeof window !== 'undefined' && window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', path);
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -307,35 +343,41 @@ export default function App() {
   };
 
   // Subdomain Hostname Detection or Path-based Routing
-  const hostSlugResult = getStorefrontSlugFromHostname(window.location.hostname);
+  // If accessing via storefront subdomain (e.g. storename.mystore.et) or query param override (?store=storename)
+  // or via direct path (/store/storename), immediately render the isolated Public Storefront
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : undefined;
+  const hostSlugResult = getStorefrontSlugFromHostname(window.location.hostname, searchParams);
   const hostnameSlug = hostSlugResult?.slug;
   const isPathStorefront = currentPath.startsWith('/store/');
-  const activeSlug =
-    (isPathStorefront ? currentPath.split('/store/')[1] : null) ||
-    (currentPath === '/' ? hostnameSlug : null);
+  const rawPathIdentifier = isPathStorefront ? currentPath.split('/store/')[1]?.split('?')[0]?.split('#')[0] : null;
+  // If hostnameSlug is present, it is a storefront domain (e.g. storename.mystore.et) -> always render public storefront directly
+  const activeIdentifier = hostnameSlug || rawPathIdentifier;
 
-  // Render Public Customer Storefront
-  if (activeSlug) {
-    const storefront = storage.getStorefrontBySlug(activeSlug);
+  // Render Public Customer Storefront (accessible to both unauthenticated visitors and logged-in users)
+  if (activeIdentifier) {
+    const storefront = storage.getStorefront(activeIdentifier) || storage.getStorefrontBySlug(activeIdentifier);
     const customization = storefront?.customization;
 
     return (
       <div>
-        {/* Banner quick back button to Portal Dashboard */}
-        <div className="bg-neutral-900 px-4 py-2 text-center text-xs text-neutral-300 flex items-center justify-between border-b border-neutral-800">
-          <span className="font-mono text-[11px] text-emerald-400">
-            SUK Storefront Subdomain Hostname: {storefront ? `${storefront.slug}.${getStorefrontDomain()}` : `${activeSlug}.${getStorefrontDomain()}`}
-          </span>
-          <button
-            onClick={() => navigate(getDefaultRouteForRole(currentUser.role))}
-            className="rounded bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/20 transition-colors"
-          >
-            ← Back to Portal ({currentUser.role.replace('_', ' ')})
-          </button>
-        </div>
+        {/* Banner quick back button to Portal Dashboard for authenticated users */}
+        {currentUser && currentUser.id !== 'guest' && (
+          <div className="bg-neutral-900 px-4 py-2 text-center text-xs text-neutral-300 flex items-center justify-between border-b border-neutral-800">
+            <span className="font-mono text-[11px] text-emerald-400">
+              SUK Storefront: {storefront ? `${storefront.storeName} (${storefront.slug}.${getStorefrontDomain()})` : `${activeIdentifier}.${getStorefrontDomain()}`}
+            </span>
+            <button
+              onClick={() => navigate(getDefaultRouteForRole(currentUser.role))}
+              className="rounded bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/20 transition-colors"
+            >
+              ← Back to Portal ({currentUser.role.replace('_', ' ')})
+            </button>
+          </div>
+        )}
 
         <PublicStorefront
-          slug={activeSlug}
+          slug={activeIdentifier}
+          storefrontOverride={storefront}
           cart={cart}
           onAddToCart={handleAddToCart}
           onOpenCart={() => setIsCartOpen(true)}
