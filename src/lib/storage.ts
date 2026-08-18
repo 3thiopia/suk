@@ -974,6 +974,8 @@ class MarketplaceStorageService {
     const users = this.getUsers();
     const updatingUser = users.find((u) => u.id === updatedByUserId) || this.getCurrentUser();
 
+    let shouldCreditCommission = false;
+
     const updated = orders.map((o) => {
       if (o.id === orderId) {
         // Business rule: Once an order is marked Delivered, the business owner cannot revert or modify the order status.
@@ -985,6 +987,11 @@ class MarketplaceStorageService {
         const isDeliveringNow = status === 'delivered' || status === 'completed';
         const isRejectingNow = status === 'rejected';
         const isCancelledNow = status === 'cancelled';
+
+        // Only credit commission if transitioning into delivered/completed for the first time
+        if (isDeliveringNow && !wasPreviouslyEarned) {
+          shouldCreditCommission = true;
+        }
 
         const existingLogs: OrderAuditLog[] = o.auditLogs || [];
         const newLog: OrderAuditLog = {
@@ -1034,8 +1041,8 @@ class MarketplaceStorageService {
     if (updatedOrder) {
       const storefront = this.getStorefronts().find((s) => s.id === updatedOrder?.storefrontId);
       if (storefront) {
-        // If order just reached delivered/completed status, credit storefront totalEarnings and pendingPayout
-        if ((status === 'delivered' || status === 'completed')) {
+        // If order transitioned to delivered/completed status for the first time, credit storefront totalEarnings and pendingPayout
+        if (shouldCreditCommission) {
           this.updateStorefront(storefront.id, {
             totalEarnings: (storefront.totalEarnings || 0) + (updatedOrder.resellerCommission || 0),
             pendingPayout: (storefront.pendingPayout || 0) + (updatedOrder.resellerCommission || 0),
@@ -1335,11 +1342,8 @@ class MarketplaceStorageService {
         0
       );
 
-      // Total commission earned: use the higher of order sums or seeded storefront totalEarnings
-      const totalCommissionEarned = Math.max(
-        ordersTotalCommission,
-        storefront?.totalEarnings || 0
-      );
+      // Total commission earned: based strictly on delivered/completed eligible orders
+      const totalCommissionEarned = ordersTotalCommission;
 
       // Creator's recorded manual payouts
       const creatorPayouts = allPayouts.filter(

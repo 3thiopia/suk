@@ -83,12 +83,14 @@ export function ResellerDashboard({ onNavigate }: ResellerDashboardProps) {
   const currentYear = new Date().getFullYear();
   const monthlyCommission = orders
     .filter((o) => {
-      const d = new Date(o.createdAt);
+      const isDelivered = o.status === 'delivered' || o.status === 'completed' || o.commissionEligibleForPayout;
+      if (!isDelivered) return false;
+      const d = new Date(o.deliveredAt || o.createdAt);
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     })
     .reduce((sum, o) => sum + o.resellerCommission, 0);
 
-  // Commission by product breakdown
+  // Commission by product breakdown (only counts completed/delivered units)
   const productCommissions = storefrontProducts
     .map((sp) => {
       const p = sp.product;
@@ -96,8 +98,12 @@ export function ResellerDashboard({ onNavigate }: ResellerDashboardProps) {
       const biz = storage.getBusinessById(p.businessId);
       const comm = getProductCommission(p, biz);
 
-      const productOrders = orders.filter((o) => o.items.some((item) => item.productId === p.id));
-      const unitsSold = productOrders.reduce((sum, o) => {
+      const deliveredProductOrders = orders.filter(
+        (o) =>
+          (o.status === 'delivered' || o.status === 'completed' || o.commissionEligibleForPayout) &&
+          o.items.some((item) => item.productId === p.id)
+      );
+      const unitsSold = deliveredProductOrders.reduce((sum, o) => {
         const matchingItems = o.items.filter((item) => item.productId === p.id);
         return sum + matchingItems.reduce((iSum, item) => iSum + item.quantity, 0);
       }, 0);
@@ -315,9 +321,25 @@ export function ResellerDashboard({ onNavigate }: ResellerDashboardProps) {
                     </div>
 
                     <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end sm:justify-center">
-                      <span className="text-xs font-semibold text-neutral-500">
-                        Commission: <strong className="text-sm font-bold text-emerald-700">{formatCurrency(order.resellerCommission)}</strong>
-                      </span>
+                      <div className="flex items-center gap-1.5 sm:justify-end">
+                        <span className="text-xs font-semibold text-neutral-500">Commission:</span>
+                        <strong className="text-sm font-bold text-emerald-700">{formatCurrency(order.resellerCommission)}</strong>
+                        <span
+                          className={`rounded px-1.5 py-0.2 text-[9px] font-bold ${
+                            order.status === 'delivered' || order.status === 'completed' || order.commissionEligibleForPayout
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : order.status === 'rejected' || order.status === 'cancelled'
+                              ? 'bg-neutral-100 text-neutral-500'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {order.status === 'delivered' || order.status === 'completed' || order.commissionEligibleForPayout
+                            ? 'Earned'
+                            : order.status === 'rejected' || order.status === 'cancelled'
+                            ? 'Cancelled'
+                            : 'Pending'}
+                        </span>
+                      </div>
                       <span className="text-[11px] text-neutral-400">Order Total: {formatCurrency(order.totalAmount)}</span>
                     </div>
                   </div>

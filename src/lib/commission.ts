@@ -107,8 +107,8 @@ export function getOrderCommissionStatus(
   // Default for pending, accepted, shipped
   return {
     statusKey: 'expected',
-    label: 'Expected Commission',
-    shortLabel: 'Expected',
+    label: 'Pending (Not Earned)',
+    shortLabel: 'Pending',
     badgeBg: 'bg-amber-50',
     badgeText: 'text-amber-800',
     badgeBorder: 'border-amber-200',
