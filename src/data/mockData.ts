@@ -1426,3 +1426,49 @@ export const initialOrderReports: OrderReport[] = [
   }
 ];
 
+export const initialCreatorPayoutAccounts: import('../types/payout').CreatorPayoutAccount[] = [
+  {
+    id: 'pact_1',
+    creatorId: 'usr_reseller_1', // Alex Rivera / TechTrends
+    payoutMethod: 'ethiopian_bank',
+    bankId: 'bank_cbe',
+    bankName: 'Commercial Bank of Ethiopia',
+    accountHolderName: 'Alex Rivera',
+    accountNumber: '1000192837465',
+    isVerified: true,
+    createdAt: '2025-02-10T10:00:00Z',
+    updatedAt: '2025-02-10T10:00:00Z',
+  },
+  {
+    id: 'pact_2',
+    creatorId: 'usr_reseller_2', // Elena Rostova / Luxe Home
+    payoutMethod: 'telebirr',
+    telebirrPhone: '+251911234567',
+    isVerified: true,
+    createdAt: '2025-03-01T11:00:00Z',
+    updatedAt: '2025-03-01T11:00:00Z',
+  },
+  {
+    id: 'pact_3',
+    creatorId: 'usr_creator_abebe', // Abebe Kebede
+    payoutMethod: 'telebirr',
+    telebirrPhone: '+251911234567',
+    isVerified: true,
+    createdAt: '2026-01-15T09:00:00Z',
+    updatedAt: '2026-01-15T09:00:00Z',
+  },
+  {
+    id: 'pact_4',
+    creatorId: 'usr_creator_meron', // Meron Bekele
+    payoutMethod: 'ethiopian_bank',
+    bankId: 'bank_awash',
+    bankName: 'Awash Bank',
+    accountHolderName: 'Meron Bekele',
+    accountNumber: '01438920194800',
+    isVerified: true,
+    createdAt: '2026-01-20T10:30:00Z',
+    updatedAt: '2026-01-20T10:30:00Z',
+  },
+];
+
+

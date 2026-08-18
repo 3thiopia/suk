@@ -1,3 +1,5 @@
+import { CreatorPayoutAccount, PayoutBank, PayoutMethodType } from './payout';
+
 export type UserRole = 'business_owner' | 'reseller' | 'creator' | 'admin' | 'customer';
 
 export type OrderStatus =
@@ -435,6 +437,8 @@ export interface CommissionPayout {
 
 export type CreatorPayoutStatus = 'not_eligible' | 'eligible' | 'paid';
 
+export * from './payout';
+
 export type PayoutPaymentMethod = 'telebirr' | 'bank_transfer' | 'cbe_birr' | 'cash' | 'other' | string;
 
 export interface CreatorPayout {
@@ -479,6 +483,7 @@ export interface CreatorCommissionBalance {
   lastPayoutDate?: string;
   lastPayoutMethod?: string;
   lastPayoutReference?: string;
+  payoutAccount?: CreatorPayoutAccount | null;
 }
 
 export interface PayoutSummaryStats {

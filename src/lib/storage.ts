@@ -49,7 +49,11 @@ import {
   ReviewReportStatus,
   RatingStats,
   ReviewSortOption,
+  PayoutBank,
+  CreatorPayoutAccount,
+  PayoutMethodType,
 } from '../types';
+import { OFFICIAL_ETHIOPIAN_BANKS } from '../data/ethiopianBanks';
 import { generateInitialSocialLinks } from './socialPlatforms';
 import { INITIAL_PLATFORM_CATEGORIES, normalizeCategoryName, CategoryWithSubcategories } from '../data/categoriesData';
 import {
@@ -64,6 +68,7 @@ import {
   initialNotifications,
   initialPayouts,
   initialCreatorPayouts,
+  initialCreatorPayoutAccounts,
   initialCategories,
   initialDisputes,
   initialReports,
@@ -95,6 +100,8 @@ const STORAGE_KEYS = {
   ORDERS: 'wl_orders',
   PAYOUTS: 'wl_payouts',
   CREATOR_PAYOUTS: 'wl_creator_payouts',
+  CREATOR_PAYOUT_ACCOUNTS: 'wl_creator_payout_accounts',
+  PAYOUT_BANKS: 'wl_payout_banks',
   CREATOR_MIN_PAYOUT: 'wl_creator_min_payout',
   NOTIFICATIONS: 'wl_notifications',
   FOLLOWERS: 'wl_followers',
@@ -905,21 +912,19 @@ class MarketplaceStorageService {
       }
     });
 
-    // Update storefront earnings & stats
+    // Update storefront stats (Do NOT add to totalEarnings or pendingPayout yet; commissions are pending until delivered)
     if (storefront) {
       this.updateStorefront(storefront.id, {
-        totalEarnings: storefront.totalEarnings + newOrder.resellerCommission,
-        pendingPayout: storefront.pendingPayout + newOrder.resellerCommission,
         totalOrdersCount: storefront.totalOrdersCount + 1,
       });
 
-      // Notify Reseller
+      // Notify Creator of new pending order without indicating premature earnings
       this.createNotification({
         userId: storefront.resellerId,
         userRole: 'reseller',
         type: 'new_order',
-        title: 'New Storefront Sale!',
-        message: `Order #${newOrder.id} placed for $${newOrder.totalAmount.toFixed(2)}. You earned $${newOrder.resellerCommission.toFixed(2)} commission!`,
+        title: 'New Storefront Order Received',
+        message: `Order #${newOrder.id} placed for $${newOrder.totalAmount.toFixed(2)}. Status is currently Pending owner fulfillment.`,
         link: '/reseller/orders',
       });
     }
@@ -976,8 +981,10 @@ class MarketplaceStorageService {
           throw new Error('Order is already marked as Delivered and locked. Status cannot be modified through the business dashboard.');
         }
 
-        const isDeliveringNow = status === 'delivered';
+        const wasPreviouslyEarned = o.status === 'delivered' || o.status === 'completed' || o.commissionEligibleForPayout;
+        const isDeliveringNow = status === 'delivered' || status === 'completed';
         const isRejectingNow = status === 'rejected';
+        const isCancelledNow = status === 'cancelled';
 
         const existingLogs: OrderAuditLog[] = o.auditLogs || [];
         const newLog: OrderAuditLog = {
@@ -991,6 +998,8 @@ class MarketplaceStorageService {
             ? rejectionReason?.trim()
               ? `Order rejected. Reason: ${rejectionReason.trim()}`
               : 'Order rejected without reason specified.'
+            : isCancelledNow
+            ? `Order cancelled.`
             : `Order status updated to ${status}.`,
           rejectionReason: isRejectingNow ? (rejectionReason?.trim() || undefined) : undefined,
         };
@@ -1004,11 +1013,14 @@ class MarketplaceStorageService {
             commissionEligibleForPayout: true,
             isDeliveredLocked: true,
           } : {}),
-          ...(isRejectingNow ? {
-            rejectedAt: now,
-            rejectedBy: updatedByUserId,
-            rejectedByName: updatingUser?.name || 'Business Owner',
-            rejectionReason: rejectionReason?.trim() || '',
+          ...((isRejectingNow || isCancelledNow) ? {
+            commissionEligibleForPayout: false,
+            ...(isRejectingNow ? {
+              rejectedAt: now,
+              rejectedBy: updatedByUserId,
+              rejectedByName: updatingUser?.name || 'Business Owner',
+              rejectionReason: rejectionReason?.trim() || '',
+            } : {}),
           } : {}),
           auditLogs: [newLog, ...existingLogs],
         };
@@ -1022,12 +1034,20 @@ class MarketplaceStorageService {
     if (updatedOrder) {
       const storefront = this.getStorefronts().find((s) => s.id === updatedOrder?.storefrontId);
       if (storefront) {
+        // If order just reached delivered/completed status, credit storefront totalEarnings and pendingPayout
+        if ((status === 'delivered' || status === 'completed')) {
+          this.updateStorefront(storefront.id, {
+            totalEarnings: (storefront.totalEarnings || 0) + (updatedOrder.resellerCommission || 0),
+            pendingPayout: (storefront.pendingPayout || 0) + (updatedOrder.resellerCommission || 0),
+          });
+        }
+
         const statusMapTitle: Record<string, string> = {
           accepted: 'Order Accepted by Brand',
           rejected: 'Order Rejected by Brand',
           shipped: 'Order Shipped!',
-          delivered: 'Order Delivered & Commission Recorded',
-          completed: 'Order Completed',
+          delivered: 'Order Delivered & Commission Earned',
+          completed: 'Order Completed & Commission Earned',
           cancelled: 'Order Cancelled',
         };
 
@@ -1038,12 +1058,12 @@ class MarketplaceStorageService {
             ? 'order_rejected'
             : status === 'shipped'
             ? 'order_shipped'
-            : status === 'delivered'
-            ? 'order_delivered'
+            : (status === 'delivered' || status === 'completed')
+            ? 'commission_earned'
             : 'new_order';
 
-        const resellerMsg = status === 'delivered'
-          ? `Order #${updatedOrder.id} has been marked as delivered by the supplier brand. Your commission of $${updatedOrder.resellerCommission.toFixed(2)} is now recorded and eligible for the upcoming monthly payout cycle.`
+        const resellerMsg = (status === 'delivered' || status === 'completed')
+          ? `Order #${updatedOrder.id} has been delivered! Your commission of $${updatedOrder.resellerCommission.toFixed(2)} is now officially earned and added to your unpaid balance.`
           : status === 'rejected'
           ? `Order #${updatedOrder.id} was rejected by the brand owner${updatedOrder.rejectionReason ? ` (Reason: "${updatedOrder.rejectionReason}")` : ''}.`
           : `Order #${updatedOrder.id} status changed to ${status.toUpperCase()}.`;
@@ -1344,6 +1364,7 @@ class MarketplaceStorageService {
       }
 
       const lastPayout = creatorPayouts[0];
+      const payoutAccount = this.getCreatorPayoutAccount(user.id);
 
       const cleanCreatorName = user.name.includes('(')
         ? user.name.split('(')[0].trim()
@@ -1369,6 +1390,7 @@ class MarketplaceStorageService {
         lastPayoutDate: lastPayout?.paidAt,
         lastPayoutMethod: lastPayout?.paymentMethod,
         lastPayoutReference: lastPayout?.transactionReference,
+        payoutAccount,
       };
     });
   }
@@ -1527,6 +1549,132 @@ class MarketplaceStorageService {
 
     this.notify();
     return newPayout;
+  }
+
+  // --- ETHIOPIAN PAYOUT BANKS REFERENCE REPOSITORY ---
+  public getPayoutBanks(includeInactive: boolean = false): PayoutBank[] {
+    const banks = this.getItem<PayoutBank[]>(STORAGE_KEYS.PAYOUT_BANKS, OFFICIAL_ETHIOPIAN_BANKS);
+    if (includeInactive) {
+      return [...banks].sort((a, b) => (a.displayOrder || 99) - (b.displayOrder || 99));
+    }
+    return banks
+      .filter((b) => b.isActive !== false)
+      .sort((a, b) => (a.displayOrder || 99) - (b.displayOrder || 99));
+  }
+
+  public getAllPayoutBanks(): PayoutBank[] {
+    return this.getPayoutBanks(true);
+  }
+
+  public getPayoutBankById(bankId: string): PayoutBank | null {
+    const banks = this.getAllPayoutBanks();
+    return banks.find((b) => b.id === bankId) || null;
+  }
+
+  public togglePayoutBankStatus(bankId: string, isActive?: boolean): PayoutBank | null {
+    const banks = this.getAllPayoutBanks();
+    const target = banks.find((b) => b.id === bankId);
+    if (!target) return null;
+
+    const newStatus = isActive !== undefined ? isActive : !target.isActive;
+    const updatedBanks = banks.map((b) => (b.id === bankId ? { ...b, isActive: newStatus } : b));
+    this.setItem(STORAGE_KEYS.PAYOUT_BANKS, updatedBanks);
+
+    this.logAdminAction(
+      'UPDATE_PAYOUT_BANK_STATUS',
+      'platform_settings',
+      bankId,
+      `Admin changed status of bank "${target.name}" to ${newStatus ? 'Active' : 'Inactive'}.`
+    );
+
+    this.notify();
+    return { ...target, isActive: newStatus };
+  }
+
+  // --- CREATOR COMMISSION PAYOUT ACCOUNTS ---
+  public getCreatorPayoutAccounts(): CreatorPayoutAccount[] {
+    return this.getItem<CreatorPayoutAccount[]>(
+      STORAGE_KEYS.CREATOR_PAYOUT_ACCOUNTS,
+      initialCreatorPayoutAccounts
+    );
+  }
+
+  public getCreatorPayoutAccount(creatorId: string): CreatorPayoutAccount | null {
+    const accounts = this.getCreatorPayoutAccounts();
+    const account = accounts.find((a) => a.creatorId === creatorId);
+    if (!account) return null;
+
+    // Resolve current bank name dynamically if bankId exists
+    if (account.bankId) {
+      const bank = this.getPayoutBankById(account.bankId);
+      if (bank) {
+        return {
+          ...account,
+          bankName: bank.name,
+        };
+      }
+    }
+    return account;
+  }
+
+  public saveCreatorPayoutAccount(params: {
+    creatorId: string;
+    payoutMethod: PayoutMethodType;
+    bankId?: string;
+    accountHolderName?: string;
+    accountNumber?: string;
+    telebirrPhone?: string;
+  }): CreatorPayoutAccount {
+    const { creatorId, payoutMethod, bankId, accountHolderName, accountNumber, telebirrPhone } = params;
+    const accounts = this.getCreatorPayoutAccounts();
+    const existingIndex = accounts.findIndex((a) => a.creatorId === creatorId);
+    const now = new Date().toISOString();
+
+    let resolvedBankName: string | undefined = undefined;
+    if (payoutMethod === 'ethiopian_bank') {
+      if (!bankId) {
+        throw new Error('Please select an Ethiopian bank from the licensed list.');
+      }
+      const bank = this.getPayoutBankById(bankId);
+      if (!bank) {
+        throw new Error('The selected Ethiopian bank is invalid.');
+      }
+      if (!accountHolderName?.trim()) {
+        throw new Error('Account holder name is required.');
+      }
+      if (!accountNumber?.trim()) {
+        throw new Error('Account number is required.');
+      }
+      resolvedBankName = bank.name;
+    } else if (payoutMethod === 'telebirr') {
+      if (!telebirrPhone?.trim()) {
+        throw new Error('Telebirr phone number is required.');
+      }
+    }
+
+    const newAccount: CreatorPayoutAccount = {
+      id: existingIndex >= 0 ? accounts[existingIndex].id : generateId('pact'),
+      creatorId,
+      payoutMethod,
+      bankId: payoutMethod === 'ethiopian_bank' ? bankId : undefined,
+      bankName: payoutMethod === 'ethiopian_bank' ? resolvedBankName : undefined,
+      accountHolderName: payoutMethod === 'ethiopian_bank' ? accountHolderName?.trim() : undefined,
+      accountNumber: payoutMethod === 'ethiopian_bank' ? accountNumber?.trim() : undefined,
+      telebirrPhone: payoutMethod === 'telebirr' ? telebirrPhone?.trim() : undefined,
+      isVerified: true,
+      updatedAt: now,
+      createdAt: existingIndex >= 0 ? accounts[existingIndex].createdAt : now,
+    };
+
+    if (existingIndex >= 0) {
+      accounts[existingIndex] = newAccount;
+    } else {
+      accounts.push(newAccount);
+    }
+
+    this.setItem(STORAGE_KEYS.CREATOR_PAYOUT_ACCOUNTS, accounts);
+    this.notify();
+    return newAccount;
   }
 
   // --- FOLLOWERS ---

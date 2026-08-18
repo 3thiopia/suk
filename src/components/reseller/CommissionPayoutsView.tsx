@@ -1,28 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   DollarSign,
   Calendar,
-  TrendingUp,
   AlertCircle,
   CheckCircle2,
   Clock,
-  ShieldCheck,
   CreditCard,
-  History,
-  Phone,
-  FileText,
-  Info,
+  Building2,
+  Smartphone,
   Check,
+  Edit3,
+  ArrowRight,
+  ShieldCheck,
+  Copy,
 } from 'lucide-react';
 import { storage } from '../../lib/storage';
-import { formatETB, formatDate, formatShortDate } from '../../lib/utils';
-import { StatCard } from '../common/StatCard';
-import { Badge } from '../common/Badge';
+import { formatETB, formatDate } from '../../lib/utils';
 import { ResponsiveDataTable, Column } from '../common/ResponsiveDataTable';
 import { ViewMode } from '../common/ViewToggle';
-import { CreatorPayout } from '../../types';
+import { CreatorPayout, CreatorPayoutAccount } from '../../types';
+import { CopyableField } from '../common/CopyableField';
 
-export function CommissionPayoutsView() {
+interface CommissionPayoutsViewProps {
+  onNavigate?: (path: string, params?: any) => void;
+}
+
+export function CommissionPayoutsView({ onNavigate }: CommissionPayoutsViewProps) {
   const currentUser = storage.getCurrentUser();
   const storefront = storage.getStorefrontByResellerId(currentUser.id);
   const minPayoutAmount = storage.getMinPayoutAmount();
@@ -31,14 +34,19 @@ export function CommissionPayoutsView() {
     typeof window !== 'undefined' && window.innerWidth < 640 ? 'cards' : 'table'
   );
 
+  const [payoutAccount, setPayoutAccount] = useState<CreatorPayoutAccount | null>(() =>
+    storage.getCreatorPayoutAccount(currentUser.id)
+  );
+
   // Subscribe to storage updates for real-time reactivity
   const [, setStorageTick] = useState(0);
-  React.useEffect(() => {
+  useEffect(() => {
     const unsubscribe = storage.subscribe(() => {
       setStorageTick((prev) => prev + 1);
+      setPayoutAccount(storage.getCreatorPayoutAccount(currentUser.id));
     });
     return unsubscribe;
-  }, []);
+  }, [currentUser.id]);
 
   if (!storefront) {
     return (
@@ -112,7 +120,18 @@ export function CommissionPayoutsView() {
       priority: 'secondary',
       cell: (p) => (
         <span className="font-mono font-bold text-neutral-900">
-          {p.transactionReference || <span className="italic text-neutral-400">Direct Handover</span>}
+          {p.transactionReference ? (
+            <CopyableField
+              valueToCopy={p.transactionReference}
+              label="Transaction reference"
+              successMessage="Reference copied"
+              size="xs"
+              showLabel={false}
+              textClassName="font-mono font-bold text-neutral-900"
+            />
+          ) : (
+            <span className="italic text-neutral-400">Direct Handover</span>
+          )}
         </span>
       ),
     },
@@ -137,11 +156,106 @@ export function CommissionPayoutsView() {
   return (
     <div className="space-y-6" id="creator-commission-view">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-black text-neutral-900">Creator Commission & Payouts</h1>
-        <p className="text-xs text-neutral-500 mt-0.5">
-          Track your earned commissions from customer orders, review unpaid balances, and monitor manual settlements via Telebirr or Bank Transfer.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-black text-neutral-900">Creator Commission & Payouts</h1>
+          <p className="text-xs text-neutral-500 mt-0.5">
+            Track your earned commissions from customer orders, review unpaid balances, and configure your Ethiopian Bank payout account.
+          </p>
+        </div>
+
+        {onNavigate && (
+          <button
+            onClick={() => onNavigate('/reseller/settings')}
+            className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl border border-neutral-300 bg-white px-3.5 py-2 text-xs font-bold text-neutral-800 shadow-2xs hover:bg-neutral-50 transition-colors"
+          >
+            <Edit3 className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Manage Payout Account</span>
+          </button>
+        )}
+      </div>
+
+      {/* Linked Payout Account Preview Card */}
+      <div className="rounded-2xl border border-neutral-200 bg-linear-to-r from-neutral-50 via-white to-neutral-50 p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-emerald-400 shadow-xs">
+              {payoutAccount?.payoutMethod === 'ethiopian_bank' ? (
+                <Building2 className="h-5 w-5" />
+              ) : (
+                <Smartphone className="h-5 w-5" />
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                  Linked Payout Account
+                </span>
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
+                  <ShieldCheck className="h-3 w-3" /> Active
+                </span>
+              </div>
+
+              {payoutAccount?.payoutMethod === 'ethiopian_bank' ? (
+                <div className="mt-1 space-y-0.5">
+                  <p className="text-sm font-black text-neutral-900 truncate">
+                    {payoutAccount.bankName || 'Ethiopian Bank'}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-neutral-600">
+                    <span className="font-medium text-neutral-500">Account:</span>
+                    {payoutAccount.accountNumber ? (
+                      <CopyableField
+                        valueToCopy={payoutAccount.accountNumber}
+                        label="Account number"
+                        successMessage="Account number copied"
+                        size="xs"
+                        showLabel={false}
+                        textClassName="font-mono font-bold text-neutral-900"
+                      />
+                    ) : (
+                      <span className="font-mono font-bold text-neutral-900">••••</span>
+                    )}
+                    <span className="text-[11px] text-neutral-400 truncate max-w-[200px]">
+                      ({payoutAccount.accountHolderName || currentUser.name})
+                    </span>
+                  </div>
+                </div>
+              ) : payoutAccount?.payoutMethod === 'telebirr' ? (
+                <div className="mt-1 space-y-0.5">
+                  <p className="text-sm font-black text-neutral-900">Telebirr Wallet</p>
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-neutral-600">
+                    <span className="font-medium text-neutral-500">Phone:</span>
+                    <CopyableField
+                      valueToCopy={payoutAccount.telebirrPhone || currentUser.phone}
+                      label="Telebirr number"
+                      successMessage="Telebirr number copied"
+                      size="xs"
+                      showLabel={false}
+                      textClassName="font-mono font-bold text-neutral-900"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-1">
+                  <p className="text-xs text-amber-700 font-medium">
+                    No verified payout account linked yet. Please configure your Ethiopian bank account.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('/reseller/settings')}
+              className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline shrink-0"
+            >
+              <span>Change Account</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Eligibility Status Banner */}
@@ -162,7 +276,7 @@ export function CommissionPayoutsView() {
                 Your available balance of {formatETB(myBalance.unpaidCommission)} meets the {formatETB(minPayoutAmount)} minimum threshold.
               </p>
               <p className="text-xs text-emerald-800 mt-0.5">
-                Platform admins will process your manual payout via Telebirr or Bank Transfer during the upcoming settlement window.
+                Platform admins will process your manual payout via your linked Ethiopian Bank or Telebirr account during the upcoming settlement cycle.
               </p>
             </div>
           </div>
@@ -276,17 +390,6 @@ export function CommissionPayoutsView() {
           </p>
           <p className="mt-1 text-[11px] text-neutral-400">Set by platform operator</p>
         </div>
-      </div>
-
-      {/* Manual Payouts Policy Notice */}
-      <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs space-y-3">
-        <div className="flex items-center gap-2 text-neutral-900 font-bold text-xs">
-          <Info className="h-4 w-4 text-emerald-600" />
-          <span>How SUK Manual Creator Payouts Work</span>
-        </div>
-        <p className="text-xs text-neutral-600 leading-relaxed">
-          Commissions are tracked from all delivered orders placed through your storefront link. When your unpaid balance reaches or exceeds the <strong>{formatETB(minPayoutAmount)}</strong> minimum payout threshold, SUK Admins process your payout manually via <strong>Telebirr</strong> or <strong>Bank Transfer</strong>. You will receive a notification and reference receipt for every payout.
-        </p>
       </div>
 
       {/* Payout History Table */}
